@@ -1,65 +1,137 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { IconLibrary, IconSearchEntry } from "../../types/icon";
+import { loadPreviewIndex, loadSearchIndex } from "@/lib/icons/manifest";
+import { createIconSearcher } from "@/lib/icons/search";
+import IconGrid from "@/components/icon-grid/IconGrid";
+import SearchBar from "@/components/icon-grid/SearchBar";
+import Sidebar from "@/components/icon-grid/Sidebar";
+import SvgUploadButton from "@/components/icon-grid/SvgUploadButton";
+import type { Technique } from "@/components/icon-grid/TechniqueFilter";
+import IconDetailPanel from "@/components/detail/IconDetailPanel";
+
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
 
 export default function Home() {
+  const [previewEntries, setPreviewEntries] = useState<IconSearchEntry[]>([]);
+  const [fullEntries, setFullEntries] = useState<IconSearchEntry[] | null>(null);
+  const fullFetchStarted = useRef(false);
+
+  const [query, setQuery] = useState("");
+  const [library, setLibrary] = useState<IconLibrary | "all">("all");
+  const [technique, setTechnique] = useState<Technique>("all");
+  const [selected, setSelected] = useState<IconSearchEntry | null>(null);
+
+  const debouncedQuery = useDebounced(query, 200);
+
+  useEffect(() => {
+    loadPreviewIndex().then(setPreviewEntries);
+  }, []);
+
+  useEffect(() => {
+    const wantsFullData =
+      debouncedQuery.trim().length > 0 || library !== "all" || technique !== "all";
+    if (wantsFullData && !fullFetchStarted.current) {
+      fullFetchStarted.current = true;
+      loadSearchIndex().then(setFullEntries);
+    }
+  }, [debouncedQuery, library, technique]);
+
+  const activeEntries = fullEntries ?? previewEntries;
+  const search = useMemo(() => createIconSearcher(activeEntries), [activeEntries]);
+
+  const filtered = useMemo(() => {
+    let results = search(debouncedQuery);
+    if (library !== "all") results = results.filter((r) => r.library === library);
+    if (technique !== "all") {
+      const wantsStroke = technique === "stroke";
+      results = results.filter((r) => r.isStrokeBased === wantsStroke);
+    }
+    return results;
+  }, [search, debouncedQuery, library, technique]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="flex h-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+      <header className="grid min-h-32 border-b border-[var(--line)] md:grid-cols-[26%_12%_12%_12%_12%_1fr]">
+        <div className="flex min-h-32 items-start border-b border-[var(--line)] p-6 md:border-b-0 md:border-r">
+          <div>
+            <h1 className="font-[family-name:var(--font-panchang)] text-4xl font-extrabold leading-none tracking-normal text-[var(--foreground)]">
+              Blick
+              <sup className="ml-1 align-super text-xs font-extrabold">TM</sup>
+            </h1>
+            <p className="mt-3 max-w-48 text-xs leading-5 text-[var(--muted)]">
+              Animated icon library workspace
+            </p>
+          </div>
+        </div>
+
+        <div className="hidden border-r border-[var(--line)] p-5 md:block">
+          <p className="text-sm font-bold">Icons</p>
+          <p className="mt-8 text-xs font-bold text-[var(--foreground)]">
+            {filtered.length.toLocaleString()}
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="hidden bg-[var(--active)] p-5 text-[var(--active-ink)] md:block">
+          <p className="text-sm font-bold">Browse</p>
+          <p className="mt-8 text-xs font-bold">{fullEntries === null ? "Preview" : "Full"}</p>
         </div>
-      </main>
+
+        <div className="hidden border-x border-[var(--line)] p-5 text-[var(--subtle)] md:block">
+          <p className="text-sm font-bold">Animate</p>
+        </div>
+
+        <div className="hidden border-r border-[var(--line)] p-5 text-[var(--subtle)] md:block">
+          <p className="text-sm font-bold">Export</p>
+        </div>
+
+        <div className="flex items-start justify-end gap-5 p-5">
+          <button
+            type="button"
+            className="mt-1 flex h-10 w-16 shrink-0 items-center justify-center border border-transparent text-[var(--foreground)] transition-colors hover:border-[var(--line)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+            aria-label="Open menu"
+          >
+            <span className="flex flex-col gap-2">
+              <span className="h-0.5 w-12 bg-current" />
+              <span className="h-0.5 w-12 bg-current" />
+            </span>
+          </button>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1">
+        <Sidebar
+          library={library}
+          onLibraryChange={setLibrary}
+          technique={technique}
+          onTechniqueChange={setTechnique}
+        />
+
+        <main className="min-w-0 flex-1 overflow-hidden border-r border-[var(--line)]">
+          <div className="flex h-12 items-center justify-between gap-4 border-b border-[var(--line)] px-4 text-xs text-[var(--muted)]">
+            <SearchBar value={query} onChange={setQuery} className="max-w-md" />
+            <div className="flex shrink-0 items-center gap-4">
+              <SvgUploadButton />
+              <span className="hidden sm:inline">
+                {selected ? `${selected.name} selected` : "No styles selected"}
+              </span>
+            </div>
+          </div>
+          <div className="h-[calc(100%-3rem)]">
+            <IconGrid entries={filtered} onSelect={setSelected} />
+          </div>
+        </main>
+      </div>
+
+      {selected && <IconDetailPanel entry={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }

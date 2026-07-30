@@ -1,26 +1,61 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: oklch(0.07 0.006 130);
+  --foreground: oklch(0.96 0.035 104);
+  --panel: oklch(0.1 0.008 130);
+  --surface: oklch(0.13 0.01 130);
+  --control: oklch(0.18 0.012 130);
+  --line: oklch(0.28 0.014 130);
+  --line-strong: oklch(0.38 0.018 130);
+  --muted: oklch(0.72 0.028 104);
+  --subtle: oklch(0.57 0.022 104);
+  --accent: oklch(0.92 0.23 121);
+  --active: oklch(0.96 0.05 103);
+  --active-ink: oklch(0.14 0.012 130);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-zodiak);
+  --font-display: var(--font-panchang);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-zodiak), Georgia, serif;
+}
+
+* {
+  scrollbar-color: color-mix(in oklch, var(--foreground) 22%, transparent) transparent;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--active-ink);
+}
+
+.blick-color-picker {
+  height: 150px !important;
+}
+
+.blick-color-picker .react-colorful__saturation {
+  border: 1px solid var(--line) !important;
+  border-bottom: 0 !important;
+  border-radius: 0 !important;
+}
+
+.blick-color-picker .react-colorful__hue {
+  height: 16px !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+}
+
+.blick-color-picker .react-colorful__pointer {
+  height: 18px !important;
+  width: 18px !important;
+  border: 2px solid var(--foreground) !important;
+  box-shadow: none !important;
 }
