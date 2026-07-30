@@ -43,12 +43,12 @@ next-env.d.ts
 public/icons-full/heroicons 
 public/icons-full/iconoir
 public/icons-full/heroicons 
-public/icons-full/iconoir 
-public/icons-full/lucide 
-public/icons-full/phosphor 
-public/icons-full/remixicon 
-public/icons-full/tabler 
-public/icons-full/lucide 
-public/icons-full/phosphor 
-public/icons-full/remixicon 
+# public/icons-full/iconoir 
+# public/icons-full/lucide 
+# public/icons-full/phosphor 
+# public/icons-full/remixicon 
+# public/icons-full/tabler 
+# public/icons-full/lucide 
+# public/icons-full/phosphor 
+# public/icons-full/remixicon 
 # public/icons-full/tabler
