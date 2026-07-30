@@ -177,7 +177,15 @@ export default function ExportActions({
                   />
                 </label>
                 <label className="flex min-h-9 items-center justify-between gap-3 self-end border border-[var(--line)] bg-[var(--background)] px-2 text-xs font-medium text-[var(--muted)]">
-                  Alpha
+                  <span className="inline-flex items-center gap-1">
+                    Alpha
+                    <span
+                      title="Alpha means transparent background. GIF and WebM can use it; MP4 will use the background color."
+                      className="grid h-4 w-4 place-items-center border border-[var(--line)] text-[10px] text-[var(--foreground)]"
+                    >
+                      ?
+                    </span>
+                  </span>
                   <input
                     type="checkbox"
                     checked={transparent}

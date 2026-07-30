@@ -13,6 +13,7 @@ import ParamControls from "@/components/detail/ParamControls";
 
 type StrokeDirection = "forward" | "backward" | "center-out";
 type PlaybackMode = "loop" | "once";
+type SequenceTrigger = "auto" | "hover-in" | "hover-out";
 
 interface AnimationSequence {
   id: string;
@@ -24,6 +25,7 @@ interface AnimationSequence {
   delayMs: number;
   direction: StrokeDirection;
   reverse: boolean;
+  trigger: SequenceTrigger;
 }
 
 interface DeletedSequence {
@@ -76,6 +78,7 @@ function createSequence({
     delayMs,
     direction: "forward",
     reverse: false,
+    trigger: "auto",
   };
 }
 
@@ -98,6 +101,92 @@ function sequenceOffsets(sequences: AnimationSequence[]) {
 
 function formatTime(ms: number) {
   return `${(ms / 1000).toFixed(2)}s`;
+}
+
+function triggerLabel(trigger: SequenceTrigger) {
+  if (trigger === "hover-in") return "Hover";
+  if (trigger === "hover-out") return "Leave";
+  return "Auto";
+}
+
+function Glyph({
+  name,
+  className = "h-4 w-4",
+}: {
+  name:
+    | "play"
+    | "pause"
+    | "reset"
+    | "loop"
+    | "once"
+    | "copy"
+    | "trash"
+    | "auto"
+    | "hover"
+    | "leave"
+    | "forward"
+    | "backward"
+    | "center"
+    | "reverse";
+  className?: string;
+}) {
+  const common = {
+    className,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+
+  if (name === "play") return <svg {...common}><path d="M8 5v14l11-7z" /></svg>;
+  if (name === "pause") return <svg {...common}><path d="M8 5v14" /><path d="M16 5v14" /></svg>;
+  if (name === "reset") return <svg {...common}><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v6h6" /></svg>;
+  if (name === "loop") return <svg {...common}><path d="M17 2l4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><path d="M7 22l-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>;
+  if (name === "once") return <svg {...common}><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>;
+  if (name === "copy") return <svg {...common}><rect x="8" y="8" width="12" height="12" rx="1" /><path d="M4 16V5a1 1 0 0 1 1-1h11" /></svg>;
+  if (name === "trash") return <svg {...common}><path d="M4 7h16" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M6 7l1 14h10l1-14" /><path d="M9 7V4h6v3" /></svg>;
+  if (name === "auto") return <svg {...common}><path d="M13 2L4 14h7l-1 8 9-12h-7z" /></svg>;
+  if (name === "hover") return <svg {...common}><path d="M9 4v9l-2-2a2 2 0 0 0-3 3l5 6h7l3-7" /><path d="M13 4v8" /></svg>;
+  if (name === "leave") return <svg {...common}><path d="M9 4v9l-2-2a2 2 0 0 0-3 3l5 6h7l3-7" /><path d="M15 5l4 4-4 4" /></svg>;
+  if (name === "forward") return <svg {...common}><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>;
+  if (name === "backward") return <svg {...common}><path d="M19 12H5" /><path d="M11 6l-6 6 6 6" /></svg>;
+  if (name === "center") return <svg {...common}><path d="M4 12h6" /><path d="M14 12h6" /><path d="M10 8l4 4-4 4" /><path d="M14 8l-4 4 4 4" /></svg>;
+  if (name === "reverse") return <svg {...common}><path d="M7 7h10v4" /><path d="M17 17H7v-4" /><path d="M17 7l-4-4" /><path d="M7 17l4 4" /></svg>;
+  return <svg {...common}><path d="M12 5v14" /><path d="M5 12h14" /></svg>;
+}
+
+function IconButton({
+  label,
+  icon,
+  active = false,
+  disabled = false,
+  onClick,
+}: {
+  label: string;
+  icon: Parameters<typeof Glyph>[0]["name"];
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={`grid min-h-9 min-w-9 place-items-center border border-[var(--line-strong)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40 ${
+        active
+          ? "bg-[var(--active)] text-[var(--active-ink)]"
+          : "bg-[var(--control)] text-[var(--foreground)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+      }`}
+    >
+      <Glyph name={icon} />
+    </button>
+  );
 }
 
 function drawStrokeStyle({
@@ -250,7 +339,12 @@ function SequencePreview({
 
     activeSequence?.pathIndexes.forEach((pathIndex) => {
       const node = nodes[pathIndex];
-      if (node) node.style.filter = "drop-shadow(0 0 6px color-mix(in oklch, var(--accent) 72%, transparent))";
+      if (node) {
+        const currentOpacity = Number(node.style.opacity || 0);
+        node.style.opacity = `${Math.max(currentOpacity, 0.34)}`;
+        node.style.filter =
+          "drop-shadow(0 0 6px color-mix(in oklch, var(--accent) 72%, transparent))";
+      }
     });
 
     if (hoveredPathIndex !== null) {
@@ -320,6 +414,8 @@ function SequenceRailItem({
 }) {
   const dragControls = useDragControls();
   const isEmpty = sequence.pathIndexes.length === 0;
+  const triggerIcon =
+    sequence.trigger === "hover-in" ? "hover" : sequence.trigger === "hover-out" ? "leave" : "auto";
 
   return (
     <Reorder.Item
@@ -363,7 +459,13 @@ function SequenceRailItem({
           >
             <span className="flex items-center justify-between gap-3">
               <span className="min-w-0 truncate text-sm font-semibold">{sequence.name}</span>
-              <span className="shrink-0 text-[10px]">{formatTime(offset?.start ?? 0)}</span>
+              <span
+                className="inline-flex shrink-0 items-center gap-1 text-[10px]"
+                title={`Trigger: ${triggerLabel(sequence.trigger)}`}
+              >
+                <Glyph name={triggerIcon} className="h-3 w-3" />
+                {formatTime(offset?.start ?? 0)}
+              </span>
             </span>
             <span className="mt-2 block text-xs">
               {index + 1} / {isEmpty ? "No strokes" : `${sequence.pathIndexes.length} strokes`} /{" "}
@@ -376,18 +478,22 @@ function SequenceRailItem({
           <div className="grid grid-cols-2 border-t border-current/15 text-[10px] font-semibold">
             <button
               type="button"
+              title={`Duplicate ${sequence.name}`}
+              aria-label={`Duplicate ${sequence.name}`}
               onClick={onDuplicate}
-              className="min-h-8 border-r border-current/15 transition-colors hover:bg-current/10 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--accent)]"
+              className="grid min-h-8 place-items-center border-r border-current/15 transition-colors hover:bg-current/10 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--accent)]"
             >
-              Copy
+              <Glyph name="copy" className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
+              title={`Delete ${sequence.name}`}
+              aria-label={`Delete ${sequence.name}`}
               onClick={onDelete}
               disabled={!canDelete}
-              className="min-h-8 transition-colors hover:bg-current/10 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-35"
+              className="grid min-h-8 place-items-center transition-colors hover:bg-current/10 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-35"
             >
-              Delete
+              <Glyph name="trash" className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -748,31 +854,48 @@ function WorkshopEditor({ icon, color }: { icon: IconMeta; color: string }) {
 
           <div className="border-t border-[var(--line)] p-4">
             <div className="mb-3 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
+              <IconButton
+                label={isPlaying ? "Pause preview" : "Play preview"}
+                icon={isPlaying ? "pause" : "play"}
+                active
                 onClick={() => setIsPlaying((current) => !current)}
-                className="min-h-9 min-w-20 bg-[var(--accent)] px-3 text-xs font-semibold text-[var(--active-ink)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]"
-              >
-                {isPlaying ? "Pause" : "Play"}
-              </button>
-              <button
-                type="button"
+              />
+              <IconButton
+                label="Reset preview"
+                icon="reset"
                 onClick={() => {
                   setIsPlaying(false);
                   setPlayheadMs(0);
                 }}
-                className="min-h-9 border border-[var(--line-strong)] bg-[var(--control)] px-3 text-xs font-semibold text-[var(--foreground)] hover:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-              >
-                Reset
-              </button>
-              <select
-                value={playbackMode}
-                onChange={(event) => setPlaybackMode(event.target.value as PlaybackMode)}
-                className="min-h-9 border border-[var(--line-strong)] bg-[var(--control)] px-3 text-xs font-semibold text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-              >
-                <option value="loop">Loop</option>
-                <option value="once">Play once</option>
-              </select>
+              />
+              <div className="flex border border-[var(--line-strong)]">
+                <button
+                  type="button"
+                  title="Loop preview"
+                  aria-label="Loop preview"
+                  onClick={() => setPlaybackMode("loop")}
+                  className={`grid min-h-9 min-w-9 place-items-center ${
+                    playbackMode === "loop"
+                      ? "bg-[var(--active)] text-[var(--active-ink)]"
+                      : "bg-[var(--control)] text-[var(--foreground)] hover:text-[var(--accent)]"
+                  }`}
+                >
+                  <Glyph name="loop" />
+                </button>
+                <button
+                  type="button"
+                  title="Play once"
+                  aria-label="Play once"
+                  onClick={() => setPlaybackMode("once")}
+                  className={`grid min-h-9 min-w-9 place-items-center border-l border-[var(--line-strong)] ${
+                    playbackMode === "once"
+                      ? "bg-[var(--active)] text-[var(--active-ink)]"
+                      : "bg-[var(--control)] text-[var(--foreground)] hover:text-[var(--accent)]"
+                  }`}
+                >
+                  <Glyph name="once" />
+                </button>
+              </div>
               <span className="ml-auto text-xs text-[var(--muted)]">
                 {formatTime(playheadMs)} / {formatTime(totalMs)}
               </span>
@@ -848,13 +971,11 @@ function WorkshopEditor({ icon, color }: { icon: IconMeta; color: string }) {
                   </div>
                 </div>
                 {sequences.length > 1 && (
-                  <button
-                    type="button"
+                  <IconButton
+                    label={`Delete ${activeSequence.name}`}
+                    icon="trash"
                     onClick={() => removeSequence(activeSequence.id)}
-                    className="text-xs text-[var(--accent)] hover:text-[var(--active)]"
-                  >
-                    Delete
-                  </button>
+                  />
                 )}
               </div>
 
@@ -889,6 +1010,32 @@ function WorkshopEditor({ icon, color }: { icon: IconMeta; color: string }) {
                 </select>
               </label>
 
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm font-medium text-[var(--muted)]">
+                  <span>Trigger</span>
+                  <span className="text-xs text-[var(--foreground)]">
+                    {triggerLabel(activeSequence.trigger)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    ["auto", "auto", "Auto timeline"],
+                    ["hover-in", "hover", "Run when target is hovered"],
+                    ["hover-out", "leave", "Run when hover leaves target"],
+                  ].map(([value, iconName, label]) => (
+                    <IconButton
+                      key={value}
+                      label={label}
+                      icon={iconName as Parameters<typeof Glyph>[0]["name"]}
+                      active={activeSequence.trigger === value}
+                      onClick={() =>
+                        updateSequence(activeSequence.id, { trigger: value as SequenceTrigger })
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+
               <ParamControls
                 definition={activeDefinition}
                 params={activeSequence.params}
@@ -916,35 +1063,42 @@ function WorkshopEditor({ icon, color }: { icon: IconMeta; color: string }) {
               </label>
 
               {activeSequence.animationId === "draw-on" && (
-                <label className="flex flex-col gap-2 text-sm font-medium text-[var(--muted)]">
-                  Direction
-                  <select
-                    value={activeSequence.direction}
-                    onChange={(event) =>
-                      updateSequence(activeSequence.id, {
-                        direction: event.target.value as StrokeDirection,
-                      })
-                    }
-                    className="min-h-10 border border-[var(--line-strong)] bg-[var(--control)] px-3 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                  >
-                    <option value="forward">Forward</option>
-                    <option value="backward">Backward</option>
-                    <option value="center-out">Center out</option>
-                  </select>
-                </label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm font-medium text-[var(--muted)]">
+                    <span>Direction</span>
+                    <span className="text-xs text-[var(--foreground)]">{activeSequence.direction}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      ["forward", "forward", "Draw forward"],
+                      ["backward", "backward", "Draw backward"],
+                      ["center-out", "center", "Draw from center outward"],
+                    ].map(([value, iconName, label]) => (
+                      <IconButton
+                        key={value}
+                        label={label}
+                        icon={iconName as Parameters<typeof Glyph>[0]["name"]}
+                        active={activeSequence.direction === value}
+                        onClick={() =>
+                          updateSequence(activeSequence.id, { direction: value as StrokeDirection })
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
 
-              <label className="flex items-center justify-between gap-4 border border-[var(--line)] bg-[var(--background)] p-3 text-sm text-[var(--muted)]">
-                Reverse this sequence
-                <input
-                  type="checkbox"
-                  checked={activeSequence.reverse}
-                  onChange={(event) =>
-                    updateSequence(activeSequence.id, { reverse: event.target.checked })
+              <div className="flex items-center justify-between gap-3 border border-[var(--line)] bg-[var(--background)] p-3">
+                <span className="text-sm font-medium text-[var(--muted)]">Reverse</span>
+                <IconButton
+                  label="Reverse sequence"
+                  icon="reverse"
+                  active={activeSequence.reverse}
+                  onClick={() =>
+                    updateSequence(activeSequence.id, { reverse: !activeSequence.reverse })
                   }
-                  className="h-5 w-5 accent-[var(--accent)]"
                 />
-              </label>
+              </div>
 
               <div className="border border-[var(--line)]">
                 <div className="flex items-center justify-between border-b border-[var(--line)] p-3">
