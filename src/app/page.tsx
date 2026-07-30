@@ -94,16 +94,7 @@ export default function Home() {
         </div>
 
         <div className="flex items-start justify-end gap-5 p-5">
-          <button
-            type="button"
-            className="mt-1 flex h-10 w-16 shrink-0 items-center justify-center border border-transparent text-[var(--foreground)] transition-colors hover:border-[var(--line)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            aria-label="Open menu"
-          >
-            <span className="flex flex-col gap-2">
-              <span className="h-0.5 w-12 bg-current" />
-              <span className="h-0.5 w-12 bg-current" />
-            </span>
-          </button>
+          <SvgUploadButton />
         </div>
       </header>
 
@@ -119,7 +110,6 @@ export default function Home() {
           <div className="flex h-12 items-center justify-between gap-4 border-b border-[var(--line)] px-4 text-xs text-[var(--muted)]">
             <SearchBar value={query} onChange={setQuery} className="max-w-md" />
             <div className="flex shrink-0 items-center gap-4">
-              <SvgUploadButton />
               <span className="hidden sm:inline">
                 {selected ? `${selected.name} selected` : "No styles selected"}
               </span>

@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import type { IconMeta, IconSearchEntry } from "../../../types/icon";
 import { loadIcon } from "@/lib/icons/load-icon";
 import { getAnimation, getAvailableAnimations } from "@/lib/animation/registry";
+import { singleSequencePayload } from "@/lib/export/animated-svg";
 import { useProjectStore } from "@/lib/state/project-store";
+import ExportActions from "@/components/export/ExportActions";
 import LivePreview from "./LivePreview";
 import ColorPicker from "./ColorPicker";
 import ParamControls from "./ParamControls";
@@ -68,7 +70,18 @@ export default function IconDetailPanel({
     if (nextDefinition) setDurationMs(nextDefinition.defaultDurationMs);
   };
 
-  const useIcon = () => {
+  const exportPayload =
+    icon && definition
+      ? singleSequencePayload({
+          icon,
+          animationId: definition.id,
+          params,
+          durationMs,
+          color,
+        })
+      : null;
+
+  const saveAndOpenWorkshop = () => {
     if (!icon) return;
     setIcon(icon);
     router.push("/workshop");
@@ -203,15 +216,18 @@ export default function IconDetailPanel({
               </div>
 
               <footer className="border-t border-[var(--line-strong)] bg-[var(--background)] p-4">
-                <button
-                  type="button"
-                  onClick={useIcon}
-                  className="min-h-12 w-full bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--active-ink)] transition-colors hover:bg-[var(--active)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]"
-                >
-                  Use this icon
-                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={saveAndOpenWorkshop}
+                    className="min-h-12 bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--active-ink)] transition-colors hover:bg-[var(--active)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]"
+                  >
+                    Open in workshop
+                  </button>
+                  <ExportActions payload={exportPayload} label="Export" fullWidth />
+                </div>
                 <p className="mt-2 text-center text-xs leading-5 text-[var(--subtle)]">
-                  Opens the workshop with this icon, color, animation, and timing.
+                  Export uses the icon, color, animation, and timing shown in this preview.
                 </p>
               </footer>
             </section>
