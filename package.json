@@ -16,6 +16,8 @@
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@phosphor-icons/core": "^2.1.1",
+    "@supabase/ssr": "^0.12.4",
+    "@supabase/supabase-js": "^2.111.0",
     "@tabler/icons": "^3.45.0",
     "framer-motion": "^12.43.0",
     "fuse.js": "^7.5.0",

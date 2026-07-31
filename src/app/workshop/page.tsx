@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import type { User } from "@supabase/supabase-js";
 import { Reorder, useAnimationFrame, useDragControls } from "framer-motion";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { IconMeta } from "../../../types/icon";
 import { animationRegistry, getAnimation, getAvailableAnimations } from "@/lib/animation/registry";
 import { getPrecomputedLength } from "@/lib/animation/path-length";
@@ -10,6 +11,8 @@ import type { AnimationDefinition, ProgressStyle } from "@/lib/animation/types";
 import ExportActions from "@/components/export/ExportActions";
 import { useProjectStore } from "@/lib/state/project-store";
 import ParamControls from "@/components/detail/ParamControls";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { listSavedProjects, saveProject, type SavedProject } from "@/lib/supabase/projects";
 
 type StrokeDirection = "forward" | "backward" | "center-out";
 type PlaybackMode = "loop" | "once";
@@ -32,6 +35,12 @@ interface DeletedSequence {
   sequence: AnimationSequence;
   index: number;
   activeSequenceId: string | null;
+}
+
+interface PendingWorkshopDraft {
+  projectId?: string | null;
+  name?: string;
+  sequences: unknown[];
 }
 
 const HOLD_MS = 700;
@@ -80,6 +89,67 @@ function createSequence({
     reverse: false,
     trigger: "auto",
   };
+}
+
+function createDefaultSequences(icon: IconMeta) {
+  return [
+    createSequence({
+      id: "sequence-1",
+      index: 0,
+      icon,
+      pathIndexes: icon.paths.map((_, index) => index),
+    }),
+  ];
+}
+
+function isAnimationSequence(value: unknown): value is AnimationSequence {
+  if (!value || typeof value !== "object") return false;
+  const sequence = value as Partial<AnimationSequence>;
+  return (
+    typeof sequence.id === "string" &&
+    typeof sequence.name === "string" &&
+    Array.isArray(sequence.pathIndexes) &&
+    sequence.pathIndexes.every((index) => Number.isInteger(index)) &&
+    typeof sequence.animationId === "string" &&
+    typeof sequence.params === "object" &&
+    typeof sequence.durationMs === "number" &&
+    typeof sequence.delayMs === "number" &&
+    typeof sequence.direction === "string" &&
+    typeof sequence.reverse === "boolean" &&
+    typeof sequence.trigger === "string"
+  );
+}
+
+function createInitialSequences(icon: IconMeta, draft: PendingWorkshopDraft | null) {
+  const saved = draft?.sequences;
+  if (!Array.isArray(saved)) return createDefaultSequences(icon);
+
+  const sequences = saved.filter(isAnimationSequence).map((sequence, index) => ({
+    ...sequence,
+    id: sequence.id || `sequence-${index + 1}`,
+    name: sequence.name || `Sequence ${index + 1}`,
+    pathIndexes: sequence.pathIndexes.filter((pathIndex) => pathIndex >= 0 && pathIndex < icon.paths.length),
+    animationId: getAnimation(sequence.animationId)?.id ?? createSequence({
+      id: `sequence-${index + 1}`,
+      index,
+      icon,
+      pathIndexes: [],
+    }).animationId,
+    params: sequence.params ?? {},
+    durationMs: Math.max(16, sequence.durationMs),
+    delayMs: Math.max(0, sequence.delayMs),
+  }));
+
+  return sequences.length > 0 ? sequences : createDefaultSequences(icon);
+}
+
+function nextSequenceNumber(sequences: AnimationSequence[]) {
+  return (
+    sequences.reduce((max, sequence) => {
+      const match = /^sequence-(\d+)$/.exec(sequence.id);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0) + 1
+  );
 }
 
 function sequenceEnd(sequence: AnimationSequence) {
@@ -503,7 +573,7 @@ function SequenceRailItem({
 }
 
 export default function WorkshopPage() {
-  const { icon, color } = useProjectStore();
+  const { icon, color, workshopDraft, clearWorkshopDraft } = useProjectStore();
 
   if (!icon) {
     return (
@@ -524,25 +594,57 @@ export default function WorkshopPage() {
     );
   }
 
-  return <WorkshopEditor key={`${icon.library}-${icon.name}-${icon.paths.length}`} icon={icon} color={color} />;
+  return (
+    <WorkshopEditor
+      key={`${icon.library}-${icon.name}-${icon.paths.length}`}
+      icon={icon}
+      color={color}
+      pendingDraft={
+        workshopDraft
+          ? {
+              projectId: workshopDraft.projectId,
+              name: workshopDraft.name,
+              sequences: workshopDraft.sequences,
+            }
+          : null
+      }
+      onDraftConsumed={clearWorkshopDraft}
+    />
+  );
 }
 
-function WorkshopEditor({ icon, color }: { icon: IconMeta; color: string }) {
-  const [sequences, setSequences] = useState<AnimationSequence[]>(() => [
-    createSequence({
-      id: "sequence-1",
-      index: 0,
-      icon,
-      pathIndexes: icon.paths.map((_, index) => index),
-    }),
-  ]);
-  const nextSequenceIdRef = useRef(2);
+function WorkshopEditor({
+  icon,
+  color,
+  pendingDraft,
+  onDraftConsumed,
+}: {
+  icon: IconMeta;
+  color: string;
+  pendingDraft: PendingWorkshopDraft | null;
+  onDraftConsumed: () => void;
+}) {
+  const initialSequences = useMemo(() => createInitialSequences(icon, pendingDraft), [icon, pendingDraft]);
+  const [sequences, setSequences] = useState<AnimationSequence[]>(() => initialSequences);
+  const nextSequenceIdRef = useRef(nextSequenceNumber(initialSequences));
   const [activeSequenceId, setActiveSequenceId] = useState<string | null>(() => sequences[0]?.id ?? null);
   const [hoveredPathIndex, setHoveredPathIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>("loop");
   const [playheadMs, setPlayheadMs] = useState(0);
   const [deletedSequence, setDeletedSequence] = useState<DeletedSequence | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [email, setEmail] = useState("");
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [projects, setProjects] = useState<SavedProject[]>([]);
+  const [projectName, setProjectName] = useState(pendingDraft?.name ?? icon.name);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(pendingDraft?.projectId ?? null);
+  const [projectMessage, setProjectMessage] = useState<string | null>(null);
+  const [showSavePanel, setShowSavePanel] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+  const loadWorkshopDraft = useProjectStore((state) => state.loadWorkshopDraft);
 
   const activeSequence =
     sequences.find((sequence) => sequence.id === activeSequenceId) ?? sequences[0] ?? null;
@@ -563,10 +665,115 @@ function WorkshopEditor({ icon, color }: { icon: IconMeta; color: string }) {
     : undefined;
 
   useEffect(() => {
+    if (pendingDraft) onDraftConsumed();
+  }, [onDraftConsumed, pendingDraft]);
+
+  useEffect(() => {
     if (!deletedSequence) return;
     const timeout = window.setTimeout(() => setDeletedSequence(null), 7000);
     return () => window.clearTimeout(timeout);
   }, [deletedSequence]);
+
+  const refreshProjects = useCallback(async (currentUser: User | null) => {
+    if (!currentUser) {
+      setProjects([]);
+      return;
+    }
+    setIsRefreshing(true);
+    const result = await listSavedProjects();
+    setProjects(result.projects);
+    setProjectMessage(result.error);
+    setIsRefreshing(false);
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getUser().then(({ data }) => {
+      const nextUser = data.user ?? null;
+      setUser(nextUser);
+      void refreshProjects(nextUser);
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const nextUser = session?.user ?? null;
+      setUser(nextUser);
+      void refreshProjects(nextUser);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [refreshProjects, supabase]);
+
+  const sendSignInLink = async () => {
+    if (!supabase) {
+      setAuthMessage("Add Supabase env vars to enable cloud saves.");
+      return;
+    }
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setAuthMessage("Enter an email address.");
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: trimmedEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/workshop`,
+      },
+    });
+    setAuthMessage(error ? error.message : "Check your email for the sign-in link.");
+  };
+
+  const signOut = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setProjects([]);
+    setCurrentProjectId(null);
+    setProjectMessage(null);
+  };
+
+  const handleSaveProject = async () => {
+    if (!user) {
+      setShowSavePanel(true);
+      setAuthMessage("Sign in to save this project.");
+      return;
+    }
+
+    setShowSavePanel(true);
+    setIsSaving(true);
+    const result = await saveProject({
+      id: currentProjectId,
+      user,
+      name: projectName,
+      icon,
+      color,
+      sequences,
+    });
+    setIsSaving(false);
+
+    if (result.error) {
+      setProjectMessage(result.error);
+      return;
+    }
+
+    if (result.project) {
+      setCurrentProjectId(result.project.id);
+      setProjectName(result.project.name);
+      setProjectMessage("Saved.");
+      await refreshProjects(user);
+    }
+  };
+
+  const loadSavedProject = (project: SavedProject) => {
+    loadWorkshopDraft({
+      projectId: project.id,
+      name: project.name,
+      icon: project.icon_data,
+      color: project.color,
+      sequences: project.sequences,
+    });
+  };
 
   const updateSequence = (id: string, patch: Partial<AnimationSequence>) => {
     setSequences((current) =>
@@ -733,7 +940,7 @@ function WorkshopEditor({ icon, color }: { icon: IconMeta; color: string }) {
 
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
-      <header className="grid min-h-32 border-b border-[var(--line)] md:grid-cols-[26%_12%_12%_12%_12%_1fr]">
+      <header className="grid min-h-32 border-b border-[var(--line)] md:grid-cols-[26%_12%_12%_12%_1fr]">
         <div className="flex min-h-32 items-start border-b border-[var(--line)] p-6 md:border-b-0 md:border-r">
           <div>
             <Link
@@ -759,9 +966,6 @@ function WorkshopEditor({ icon, color }: { icon: IconMeta; color: string }) {
           <p className="text-sm font-bold">Animate</p>
           <p className="mt-8 text-xs font-bold">{sequences.length} seq</p>
         </div>
-        <div className="hidden border-r border-[var(--line)] p-5 text-[var(--subtle)] md:block">
-          <ExportActions payload={exportPayload} />
-        </div>
         <div className="p-5 text-xs text-[var(--muted)]">
           <p>{icon.library}</p>
           <p className="mt-2 truncate text-[var(--foreground)]">{icon.name}</p>
@@ -769,7 +973,7 @@ function WorkshopEditor({ icon, color }: { icon: IconMeta; color: string }) {
       </header>
 
       <div className="grid min-h-0 flex-1 md:grid-cols-[280px_minmax(0,1fr)_390px]">
-        <aside className="min-h-0 overflow-y-auto border-b border-[var(--line)] bg-[var(--surface)] md:border-b-0 md:border-r">
+        <aside className="flex min-h-0 flex-col border-b border-[var(--line)] bg-[var(--surface)] md:border-b-0 md:border-r">
           <div className="flex items-center justify-between border-b border-[var(--line)] p-4">
             <div>
               <h2 className="text-lg font-semibold">Sequences</h2>
@@ -810,7 +1014,7 @@ function WorkshopEditor({ icon, color }: { icon: IconMeta; color: string }) {
             axis="y"
             values={sequences}
             onReorder={setSequences}
-            className="touch-pan-y"
+            className="min-h-0 flex-1 touch-pan-y overflow-y-auto"
           >
             {sequences.map((sequence, index) => {
               const offset = offsets[index];
@@ -829,6 +1033,9 @@ function WorkshopEditor({ icon, color }: { icon: IconMeta; color: string }) {
               );
             })}
           </Reorder.Group>
+          <div className="shrink-0 border-t border-[var(--line)] bg-[var(--surface)] p-4">
+            <ExportActions payload={exportPayload} label="Export animation" fullWidth />
+          </div>
         </aside>
 
         <section className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] border-b border-[var(--line)] md:border-b-0 md:border-r">
@@ -944,6 +1151,126 @@ function WorkshopEditor({ icon, color }: { icon: IconMeta; color: string }) {
         </section>
 
         <aside className="min-h-0 overflow-y-auto bg-[var(--surface)]">
+          {showSavePanel || user ? (
+          <div className="border-b border-[var(--line)] p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Cloud saves</h2>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  {supabase
+                    ? user
+                      ? user.email
+                      : "Sign in with email"
+                    : "Supabase not configured"}
+                </p>
+              </div>
+              {user && (
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="min-h-8 border border-[var(--line-strong)] bg-[var(--control)] px-3 text-xs font-semibold text-[var(--foreground)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                >
+                  Sign out
+                </button>
+              )}
+            </div>
+
+            {!user ? (
+              <div className="mt-4 grid gap-2">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  className="min-h-10 border border-[var(--line-strong)] bg-[var(--control)] px-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                />
+                <button
+                  type="button"
+                  onClick={sendSignInLink}
+                  disabled={!supabase}
+                  className="min-h-10 bg-[var(--accent)] px-3 text-sm font-semibold text-[var(--active-ink)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Send sign-in link
+                </button>
+                {authMessage && <p className="text-xs text-[var(--muted)]">{authMessage}</p>}
+              </div>
+            ) : (
+              <div className="mt-4 space-y-4">
+                <label className="flex flex-col gap-2 text-sm font-medium text-[var(--muted)]">
+                  Project name
+                  <input
+                    value={projectName}
+                    onChange={(event) => setProjectName(event.target.value)}
+                    className="min-h-10 border border-[var(--line-strong)] bg-[var(--control)] px-3 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveProject}
+                    disabled={isSaving}
+                    className="min-h-10 bg-[var(--accent)] px-3 text-sm font-semibold text-[var(--active-ink)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isSaving ? "Saving..." : currentProjectId ? "Update" : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => refreshProjects(user)}
+                    disabled={isRefreshing}
+                    className="min-h-10 border border-[var(--line-strong)] bg-[var(--control)] px-3 text-sm font-semibold text-[var(--foreground)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isRefreshing ? "Refreshing..." : "Refresh"}
+                  </button>
+                </div>
+                {projectMessage && <p className="text-xs text-[var(--muted)]">{projectMessage}</p>}
+                <div className="border border-[var(--line)]">
+                  <div className="border-b border-[var(--line)] p-3 text-xs font-semibold text-[var(--muted)]">
+                    Recent projects
+                  </div>
+                  <div className="max-h-56 overflow-y-auto">
+                    {projects.length === 0 ? (
+                      <p className="p-3 text-xs text-[var(--subtle)]">No saved projects yet.</p>
+                    ) : (
+                      projects.map((project) => (
+                        <button
+                          key={project.id}
+                          type="button"
+                          onClick={() => loadSavedProject(project)}
+                          className={`block w-full border-b border-[var(--line)] p-3 text-left text-xs transition-colors last:border-b-0 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--accent)] ${
+                            currentProjectId === project.id
+                              ? "bg-[var(--active)] text-[var(--active-ink)]"
+                              : "bg-[var(--background)] text-[var(--muted)] hover:bg-[var(--panel)] hover:text-[var(--foreground)]"
+                          }`}
+                        >
+                          <span className="block truncate font-semibold">{project.name}</span>
+                          <span className="mt-1 block truncate opacity-80">
+                            {project.icon_library} / {project.icon_name}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          ) : (
+            <div className="border-b border-[var(--line)] p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Project</h2>
+                  <p className="mt-1 text-xs text-[var(--muted)]">Save this workshop when you want it kept.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveProject}
+                  className="min-h-10 bg-[var(--accent)] px-3 text-sm font-semibold text-[var(--active-ink)] transition-colors hover:bg-[var(--active)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]"
+                >
+                  Save design
+                </button>
+              </div>
+            </div>
+          )}
           {activeSequence && activeDefinition ? (
             <div className="space-y-5 p-5">
               <div className="flex items-start justify-between gap-4">
