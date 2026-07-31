@@ -3,6 +3,7 @@ import type { IconMeta } from "../../../types/icon";
 
 interface WorkshopDraft {
   projectId?: string | null;
+  localDraftId?: string | null;
   name?: string;
   icon: IconMeta;
   color: string;

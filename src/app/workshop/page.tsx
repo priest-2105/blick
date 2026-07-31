@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { Reorder, useAnimationFrame, useDragControls } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -39,11 +40,31 @@ interface DeletedSequence {
 
 interface PendingWorkshopDraft {
   projectId?: string | null;
+  localDraftId?: string | null;
   name?: string;
   sequences: unknown[];
 }
 
 const HOLD_MS = 700;
+const LOCAL_DRAFT_PREFIX = "blick:workshop-draft:";
+const MAX_SEQUENCE_HISTORY = 60;
+
+interface LocalWorkshopDraft {
+  id: string;
+  projectId?: string | null;
+  name: string;
+  icon: IconMeta;
+  color: string;
+  sequences: AnimationSequence[];
+  activeSequenceId: string | null;
+  updatedAt: string;
+}
+
+interface SequenceHistory {
+  past: AnimationSequence[][];
+  present: AnimationSequence[];
+  future: AnimationSequence[][];
+}
 
 function clamp01(value: number) {
   return Math.min(1, Math.max(0, value));
@@ -150,6 +171,60 @@ function nextSequenceNumber(sequences: AnimationSequence[]) {
       return match ? Math.max(max, Number(match[1])) : max;
     }, 0) + 1
   );
+}
+
+function createDraftId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function localDraftKey(id: string) {
+  return `${LOCAL_DRAFT_PREFIX}${id}`;
+}
+
+function getDraftIdFromPath(pathname: string) {
+  const match = /^\/workshop\/([^/?#]+)/.exec(pathname);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function readLocalDraft(id: string): LocalWorkshopDraft | null {
+  try {
+    const raw = window.localStorage.getItem(localDraftKey(id));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LocalWorkshopDraft>;
+    if (!parsed.icon || !Array.isArray(parsed.sequences)) return null;
+    return {
+      id,
+      projectId: parsed.projectId ?? null,
+      name: parsed.name ?? parsed.icon.name,
+      icon: parsed.icon,
+      color: parsed.color ?? "#ffffff",
+      sequences: parsed.sequences.filter(isAnimationSequence),
+      activeSequenceId: parsed.activeSequenceId ?? null,
+      updatedAt: parsed.updatedAt ?? new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDraft(draft: LocalWorkshopDraft) {
+  window.localStorage.setItem(localDraftKey(draft.id), JSON.stringify(draft));
+}
+
+function pushSequenceHistory(
+  history: SequenceHistory,
+  next: AnimationSequence[] | ((current: AnimationSequence[]) => AnimationSequence[]),
+) {
+  const nextPresent = typeof next === "function" ? next(history.present) : next;
+  if (nextPresent === history.present) return history;
+
+  return {
+    past: [...history.past, history.present].slice(-MAX_SEQUENCE_HISTORY),
+    present: nextPresent,
+    future: [],
+  };
 }
 
 function sequenceEnd(sequence: AnimationSequence) {
@@ -573,7 +648,36 @@ function SequenceRailItem({
 }
 
 export default function WorkshopPage() {
-  const { icon, color, workshopDraft, clearWorkshopDraft } = useProjectStore();
+  const pathname = usePathname();
+  const { icon, color, workshopDraft, clearWorkshopDraft, loadWorkshopDraft } = useProjectStore();
+  const [restoreAttempted, setRestoreAttempted] = useState(false);
+  const localDraftId = getDraftIdFromPath(pathname);
+
+  useEffect(() => {
+    if (!localDraftId || icon || restoreAttempted) return;
+    const draft = readLocalDraft(localDraftId);
+    if (draft) {
+      loadWorkshopDraft({
+        projectId: draft.projectId,
+        localDraftId: draft.id,
+        name: draft.name,
+        icon: draft.icon,
+        color: draft.color,
+        sequences: draft.sequences,
+      });
+    }
+    setRestoreAttempted(true);
+  }, [icon, loadWorkshopDraft, localDraftId, restoreAttempted]);
+
+  if (!icon && localDraftId && !restoreAttempted) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[var(--background)] p-6 text-[var(--foreground)]">
+        <div className="border border-[var(--line)] bg-[var(--surface)] p-6 text-sm text-[var(--muted)]">
+          Restoring workshop draft...
+        </div>
+      </main>
+    );
+  }
 
   if (!icon) {
     return (
@@ -603,10 +707,13 @@ export default function WorkshopPage() {
         workshopDraft
           ? {
               projectId: workshopDraft.projectId,
+              localDraftId: workshopDraft.localDraftId ?? localDraftId,
               name: workshopDraft.name,
               sequences: workshopDraft.sequences,
             }
-          : null
+          : localDraftId
+            ? { localDraftId, sequences: [] }
+            : null
       }
       onDraftConsumed={clearWorkshopDraft}
     />
