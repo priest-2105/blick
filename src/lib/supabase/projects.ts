@@ -27,9 +27,36 @@ export interface SaveProjectInput {
 
 const selectColumns =
   "id,user_id,name,icon_library,icon_name,icon_id,icon_data,color,sequences,created_at,updated_at";
+const MAX_PROJECT_NAME_LENGTH = 160;
+const MAX_JSON_BYTES = 500_000;
+const MAX_SEQUENCES = 100;
+
+function jsonByteLength(value: unknown) {
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+}
 
 function projectIconId(icon: IconMeta) {
   return `${icon.library}:${icon.name}`;
+}
+
+function cleanProjectName(name: string, fallback: string) {
+  const trimmed = name.trim();
+  return (trimmed || fallback).slice(0, MAX_PROJECT_NAME_LENGTH);
+}
+
+function validateProjectPayload(input: SaveProjectInput) {
+  if (input.sequences.length > MAX_SEQUENCES) return "Projects can contain at most 100 sequences.";
+  if (jsonByteLength(input.icon) > MAX_JSON_BYTES) return "Icon data is too large to save.";
+  if (jsonByteLength(input.sequences) > MAX_JSON_BYTES) return "Sequence data is too large to save.";
+  return null;
+}
+
+function formatSupabaseError(message: string | undefined) {
+  if (!message) return null;
+  if (message.includes("saved_projects") && message.includes("schema cache")) {
+    return "Supabase table is missing. Run supabase/schema.sql in the Supabase SQL editor.";
+  }
+  return message;
 }
 
 export async function listSavedProjects() {
@@ -44,17 +71,19 @@ export async function listSavedProjects() {
 
   return {
     projects: (data ?? []) as SavedProject[],
-    error: error?.message ?? null,
+    error: formatSupabaseError(error?.message),
   };
 }
 
 export async function saveProject(input: SaveProjectInput) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return { project: null, error: "Supabase is not configured." };
+  const validationError = validateProjectPayload(input);
+  if (validationError) return { project: null, error: validationError };
 
   const payload = {
     user_id: input.user.id,
-    name: input.name.trim() || input.icon.name,
+    name: cleanProjectName(input.name, input.icon.name),
     icon_library: input.icon.library,
     icon_name: input.icon.name,
     icon_id: projectIconId(input.icon),
@@ -77,6 +106,6 @@ export async function saveProject(input: SaveProjectInput) {
 
   return {
     project: (data as SavedProject | null) ?? null,
-    error: error?.message ?? null,
+    error: formatSupabaseError(error?.message),
   };
 }

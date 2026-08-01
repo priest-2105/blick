@@ -14,11 +14,6 @@ pnpm dev
 bun dev
 ```
 
-NEXT_PUBLIC_SUPABASE_URL=https://tcamsorjjplvoqhufvhb.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_WiPrOhywjTeNdYoRcuWIhA_jq5ZbEqA
-
-password KcTW776p3UXq9muZ
-
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.

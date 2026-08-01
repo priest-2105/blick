@@ -43,11 +43,19 @@ interface PendingWorkshopDraft {
   localDraftId?: string | null;
   name?: string;
   sequences: unknown[];
+  activeSequenceId?: string | null;
 }
 
 const HOLD_MS = 700;
 const LOCAL_DRAFT_PREFIX = "blick:workshop-draft:";
+const LAST_LOCAL_DRAFT_KEY = "blick:last-workshop-draft";
 const MAX_SEQUENCE_HISTORY = 60;
+const MAX_LOCAL_DRAFT_BYTES = 500_000;
+const MAX_LOCAL_DRAFT_SEQUENCES = 100;
+const MAX_ICON_PATHS = 1_000;
+const MAX_TEXT_LENGTH = 160;
+const MAX_AVATAR_BYTES = 4 * 1024 * 1024;
+const AVATAR_BUCKET = "avatars";
 
 interface LocalWorkshopDraft {
   id: string;
@@ -192,16 +200,37 @@ function readLocalDraft(id: string): LocalWorkshopDraft | null {
   try {
     const raw = window.localStorage.getItem(localDraftKey(id));
     if (!raw) return null;
+    if (raw.length > MAX_LOCAL_DRAFT_BYTES) return null;
     const parsed = JSON.parse(raw) as Partial<LocalWorkshopDraft>;
-    if (!parsed.icon || !Array.isArray(parsed.sequences)) return null;
+    if (
+      !parsed.icon ||
+      typeof parsed.icon.name !== "string" ||
+      parsed.icon.name.length > MAX_TEXT_LENGTH ||
+      typeof parsed.icon.viewBox !== "string" ||
+      parsed.icon.viewBox.length > MAX_TEXT_LENGTH ||
+      !Array.isArray(parsed.icon.paths) ||
+      parsed.icon.paths.length > MAX_ICON_PATHS ||
+      !Array.isArray(parsed.sequences) ||
+      parsed.sequences.length > MAX_LOCAL_DRAFT_SEQUENCES
+    ) {
+      return null;
+    }
+
+    const sequences = parsed.sequences.filter(isAnimationSequence);
+    if (sequences.some((sequence) => sequence.name.length > MAX_TEXT_LENGTH)) return null;
+
     return {
       id,
       projectId: parsed.projectId ?? null,
-      name: parsed.name ?? parsed.icon.name,
+      name:
+        typeof parsed.name === "string" && parsed.name.length <= MAX_TEXT_LENGTH
+          ? parsed.name
+          : parsed.icon.name,
       icon: parsed.icon,
       color: parsed.color ?? "#ffffff",
-      sequences: parsed.sequences.filter(isAnimationSequence),
-      activeSequenceId: parsed.activeSequenceId ?? null,
+      sequences,
+      activeSequenceId:
+        typeof parsed.activeSequenceId === "string" ? parsed.activeSequenceId : null,
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
     };
   } catch {
@@ -211,6 +240,15 @@ function readLocalDraft(id: string): LocalWorkshopDraft | null {
 
 function writeLocalDraft(draft: LocalWorkshopDraft) {
   window.localStorage.setItem(localDraftKey(draft.id), JSON.stringify(draft));
+  window.localStorage.setItem(LAST_LOCAL_DRAFT_KEY, draft.id);
+}
+
+function readLastLocalDraftId() {
+  try {
+    return window.localStorage.getItem(LAST_LOCAL_DRAFT_KEY);
+  } catch {
+    return null;
+  }
 }
 
 function pushSequenceHistory(
@@ -272,7 +310,9 @@ function Glyph({
     | "forward"
     | "backward"
     | "center"
-    | "reverse";
+    | "reverse"
+    | "undo"
+    | "redo";
   className?: string;
 }) {
   const common = {
@@ -300,6 +340,8 @@ function Glyph({
   if (name === "backward") return <svg {...common}><path d="M19 12H5" /><path d="M11 6l-6 6 6 6" /></svg>;
   if (name === "center") return <svg {...common}><path d="M4 12h6" /><path d="M14 12h6" /><path d="M10 8l4 4-4 4" /><path d="M14 8l-4 4 4 4" /></svg>;
   if (name === "reverse") return <svg {...common}><path d="M7 7h10v4" /><path d="M17 17H7v-4" /><path d="M17 7l-4-4" /><path d="M7 17l4 4" /></svg>;
+  if (name === "undo") return <svg {...common}><path d="M9 14 4 9l5-5" /><path d="M4 9h10a6 6 0 0 1 0 12h-2" /></svg>;
+  if (name === "redo") return <svg {...common}><path d="m15 14 5-5-5-5" /><path d="M20 9H10a6 6 0 0 0 0 12h2" /></svg>;
   return <svg {...common}><path d="M12 5v14" /><path d="M5 12h14" /></svg>;
 }
 
@@ -487,8 +529,7 @@ function SequencePreview({
       if (node) {
         const currentOpacity = Number(node.style.opacity || 0);
         node.style.opacity = `${Math.max(currentOpacity, 0.34)}`;
-        node.style.filter =
-          "drop-shadow(0 0 6px color-mix(in oklch, var(--accent) 72%, transparent))";
+        node.style.filter = "";
       }
     });
 
@@ -496,7 +537,7 @@ function SequencePreview({
       const node = nodes[hoveredPathIndex];
       if (node) {
         node.style.opacity = "1";
-        node.style.filter = "drop-shadow(0 0 9px var(--accent))";
+        node.style.filter = "";
       }
     }
   });
@@ -651,10 +692,37 @@ export default function WorkshopPage() {
   const pathname = usePathname();
   const { icon, color, workshopDraft, clearWorkshopDraft, loadWorkshopDraft } = useProjectStore();
   const [restoreAttempted, setRestoreAttempted] = useState(false);
-  const localDraftId = getDraftIdFromPath(pathname);
+  const [queryDraftId, setQueryDraftId] = useState<string | null>(null);
+  const [hasAuthCode, setHasAuthCode] = useState<boolean | null>(null);
+  const localDraftId = getDraftIdFromPath(pathname) ?? queryDraftId;
 
   useEffect(() => {
-    if (!localDraftId || icon || restoreAttempted) return;
+    const timeout = window.setTimeout(
+      () => setHasAuthCode(new URLSearchParams(window.location.search).has("code")),
+      0,
+    );
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
+    if (hasAuthCode === null || !hasAuthCode || queryDraftId) return;
+    const timeout = window.setTimeout(() => setQueryDraftId(readLastLocalDraftId()), 0);
+    return () => window.clearTimeout(timeout);
+  }, [hasAuthCode, queryDraftId]);
+
+  useEffect(() => {
+    if (hasAuthCode === null) return;
+    if (!localDraftId || icon || restoreAttempted) {
+      if (!localDraftId && hasAuthCode && !restoreAttempted) {
+        const timeout = window.setTimeout(() => setRestoreAttempted(true), 0);
+        return () => window.clearTimeout(timeout);
+      }
+      if (!localDraftId && !hasAuthCode && !restoreAttempted) {
+        const timeout = window.setTimeout(() => setRestoreAttempted(true), 0);
+        return () => window.clearTimeout(timeout);
+      }
+      return;
+    }
     const draft = readLocalDraft(localDraftId);
     if (draft) {
       loadWorkshopDraft({
@@ -664,12 +732,14 @@ export default function WorkshopPage() {
         icon: draft.icon,
         color: draft.color,
         sequences: draft.sequences,
+        activeSequenceId: draft.activeSequenceId,
       });
     }
-    setRestoreAttempted(true);
-  }, [icon, loadWorkshopDraft, localDraftId, restoreAttempted]);
+    const timeout = window.setTimeout(() => setRestoreAttempted(true), 0);
+    return () => window.clearTimeout(timeout);
+  }, [hasAuthCode, icon, loadWorkshopDraft, localDraftId, restoreAttempted]);
 
-  if (!icon && localDraftId && !restoreAttempted) {
+  if (!icon && (hasAuthCode === null || localDraftId || hasAuthCode) && !restoreAttempted) {
     return (
       <main className="grid min-h-screen place-items-center bg-[var(--background)] p-6 text-[var(--foreground)]">
         <div className="border border-[var(--line)] bg-[var(--surface)] p-6 text-sm text-[var(--muted)]">
@@ -700,7 +770,7 @@ export default function WorkshopPage() {
 
   return (
     <WorkshopEditor
-      key={`${icon.library}-${icon.name}-${icon.paths.length}`}
+      key={`${workshopDraft?.projectId ?? workshopDraft?.localDraftId ?? localDraftId ?? "draft"}-${icon.library}-${icon.name}-${icon.paths.length}`}
       icon={icon}
       color={color}
       pendingDraft={
@@ -710,6 +780,7 @@ export default function WorkshopPage() {
               localDraftId: workshopDraft.localDraftId ?? localDraftId,
               name: workshopDraft.name,
               sequences: workshopDraft.sequences,
+              activeSequenceId: workshopDraft.activeSequenceId,
             }
           : localDraftId
             ? { localDraftId, sequences: [] }
@@ -732,9 +803,22 @@ function WorkshopEditor({
   onDraftConsumed: () => void;
 }) {
   const initialSequences = useMemo(() => createInitialSequences(icon, pendingDraft), [icon, pendingDraft]);
-  const [sequences, setSequences] = useState<AnimationSequence[]>(() => initialSequences);
+  const [sequenceHistory, setSequenceHistory] = useState<SequenceHistory>(() => ({
+    past: [],
+    present: initialSequences,
+    future: [],
+  }));
+  const sequences = sequenceHistory.present;
+  const setSequences = useCallback(
+    (next: AnimationSequence[] | ((current: AnimationSequence[]) => AnimationSequence[])) => {
+      setSequenceHistory((current) => pushSequenceHistory(current, next));
+    },
+    [],
+  );
   const nextSequenceIdRef = useRef(nextSequenceNumber(initialSequences));
-  const [activeSequenceId, setActiveSequenceId] = useState<string | null>(() => sequences[0]?.id ?? null);
+  const [activeSequenceId, setActiveSequenceId] = useState<string | null>(
+    () => pendingDraft?.activeSequenceId ?? sequences[0]?.id ?? null,
+  );
   const [hoveredPathIndex, setHoveredPathIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>("loop");
@@ -748,6 +832,17 @@ function WorkshopEditor({
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(pendingDraft?.projectId ?? null);
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
   const [showSavePanel, setShowSavePanel] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showProjectsModal, setShowProjectsModal] = useState(false);
+  const [accountTab, setAccountTab] = useState<"profile" | "session">("profile");
+  const [localDraftId] = useState(() => pendingDraft?.localDraftId ?? createDraftId());
+  const [profileName, setProfileName] = useState("");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState("");
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [isSendingLink, setIsSendingLink] = useState(false);
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
@@ -776,12 +871,25 @@ function WorkshopEditor({
   }, [onDraftConsumed, pendingDraft]);
 
   useEffect(() => {
+    writeLocalDraft({
+      id: localDraftId,
+      projectId: currentProjectId,
+      name: projectName,
+      icon,
+      color,
+      sequences,
+      activeSequenceId,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [activeSequenceId, color, currentProjectId, icon, localDraftId, projectName, sequences]);
+
+  useEffect(() => {
     if (!deletedSequence) return;
     const timeout = window.setTimeout(() => setDeletedSequence(null), 7000);
     return () => window.clearTimeout(timeout);
   }, [deletedSequence]);
 
-  const refreshProjects = useCallback(async (currentUser: User | null) => {
+  const refreshProjects = useCallback(async (currentUser: User | null, options?: { silent?: boolean }) => {
     if (!currentUser) {
       setProjects([]);
       return;
@@ -789,7 +897,11 @@ function WorkshopEditor({
     setIsRefreshing(true);
     const result = await listSavedProjects();
     setProjects(result.projects);
-    setProjectMessage(result.error);
+    if (options?.silent) {
+      if (!result.error) setProjectMessage(null);
+    } else {
+      setProjectMessage(result.error);
+    }
     setIsRefreshing(false);
   }, []);
 
@@ -799,14 +911,19 @@ function WorkshopEditor({
     supabase.auth.getUser().then(({ data }) => {
       const nextUser = data.user ?? null;
       setUser(nextUser);
-      void refreshProjects(nextUser);
+      setProfileName((nextUser?.user_metadata?.display_name as string | undefined) ?? "");
+      setProfileAvatarUrl((nextUser?.user_metadata?.avatar_url as string | undefined) ?? "");
+      void refreshProjects(nextUser, { silent: true });
     });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       const nextUser = session?.user ?? null;
       setUser(nextUser);
-      void refreshProjects(nextUser);
+      setProfileName((nextUser?.user_metadata?.display_name as string | undefined) ?? "");
+      setProfileAvatarUrl((nextUser?.user_metadata?.avatar_url as string | undefined) ?? "");
+      if (nextUser) setShowSavePanel(true);
+      void refreshProjects(nextUser, { silent: true });
     });
 
     return () => subscription.unsubscribe();
@@ -823,13 +940,87 @@ function WorkshopEditor({
       return;
     }
 
+    setIsSendingLink(true);
     const { error } = await supabase.auth.signInWithOtp({
       email: trimmedEmail,
       options: {
-        emailRedirectTo: `${window.location.origin}/workshop`,
+        emailRedirectTo: `${window.location.origin}/workshop/${encodeURIComponent(localDraftId)}`,
       },
     });
+    setIsSendingLink(false);
     setAuthMessage(error ? error.message : "Check your email for the sign-in link.");
+  };
+
+  const updateProfile = async () => {
+    if (!supabase || !user) return;
+    setIsUpdatingProfile(true);
+    const { data, error } = await supabase.auth.updateUser({
+      data: {
+        display_name: profileName.trim().slice(0, MAX_TEXT_LENGTH),
+        avatar_url: profileAvatarUrl.trim().slice(0, 500),
+      },
+    });
+    setIsUpdatingProfile(false);
+    if (error) {
+      setProfileMessage(error.message);
+      return;
+    }
+    setUser(data.user);
+    setProfileMessage("Profile updated.");
+  };
+
+  const uploadAvatar = async (file: File | undefined) => {
+    if (!file || !supabase || !user) return;
+    if (!file.type.startsWith("image/")) {
+      setProfileMessage("Upload an image file.");
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setProfileMessage("Avatar image must be 4 MB or smaller.");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+    const path = `${user.id}/avatar-${Date.now()}.${extension}`;
+    const { error } = await supabase.storage.from(AVATAR_BUCKET).upload(path, file, {
+      cacheControl: "3600",
+      upsert: true,
+    });
+
+    if (error) {
+      setIsUploadingAvatar(false);
+      setProfileMessage(error.message);
+      return;
+    }
+
+    const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+    setProfileAvatarUrl(data.publicUrl);
+    setIsUploadingAvatar(false);
+    setProfileMessage("Avatar uploaded. Save profile to keep it.");
+  };
+
+  const isProfileComplete = () =>
+    projectName.trim().length > 0 &&
+    profileName.trim().length > 0 &&
+    profileAvatarUrl.trim().length > 0;
+
+  const deleteAccount = async () => {
+    if (!window.confirm("Delete this account and all saved projects? This cannot be undone.")) return;
+    setIsDeletingAccount(true);
+    const response = await fetch("/api/account/delete", { method: "DELETE" });
+    setIsDeletingAccount(false);
+
+    if (!response.ok) {
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      setProfileMessage(data?.error ?? "Could not delete account.");
+      return;
+    }
+
+    await supabase?.auth.signOut();
+    setUser(null);
+    setProjects([]);
+    setShowAccountModal(false);
   };
 
   const signOut = async () => {
@@ -842,12 +1033,30 @@ function WorkshopEditor({
 
   const handleSaveProject = async () => {
     if (!user) {
+      writeLocalDraft({
+        id: localDraftId,
+        projectId: currentProjectId,
+        name: projectName,
+        icon,
+        color,
+        sequences,
+        activeSequenceId,
+        updatedAt: new Date().toISOString(),
+      });
       setShowSavePanel(true);
+      setShowAccountModal(true);
       setAuthMessage("Sign in to save this project.");
       return;
     }
 
     setShowSavePanel(true);
+    if (!isProfileComplete()) {
+      setAccountTab("profile");
+      setShowAccountModal(true);
+      setProfileMessage("Add a display name, avatar, and project name before saving.");
+      return;
+    }
+
     setIsSaving(true);
     const result = await saveProject({
       id: currentProjectId,
@@ -875,10 +1084,37 @@ function WorkshopEditor({
   const loadSavedProject = (project: SavedProject) => {
     loadWorkshopDraft({
       projectId: project.id,
+      localDraftId: project.id,
       name: project.name,
       icon: project.icon_data,
       color: project.color,
       sequences: project.sequences,
+      activeSequenceId: null,
+    });
+    setShowProjectsModal(false);
+  };
+
+  const undoSequenceEdit = () => {
+    setSequenceHistory((current) => {
+      const previous = current.past.at(-1);
+      if (!previous) return current;
+      return {
+        past: current.past.slice(0, -1),
+        present: previous,
+        future: [current.present, ...current.future],
+      };
+    });
+  };
+
+  const redoSequenceEdit = () => {
+    setSequenceHistory((current) => {
+      const next = current.future[0];
+      if (!next) return current;
+      return {
+        past: [...current.past, current.present].slice(-MAX_SEQUENCE_HISTORY),
+        present: next,
+        future: current.future.slice(1),
+      };
     });
   };
 
@@ -1147,7 +1383,7 @@ function WorkshopEditor({
 
         <section className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] border-b border-[var(--line)] md:border-b-0 md:border-r">
           <div className="grid min-h-0 place-items-center p-8">
-            <div className="grid aspect-square w-full max-w-[540px] place-items-center border border-[var(--line-strong)] bg-[var(--panel)] p-16">
+            <div className="grid aspect-square w-full max-w-[540px] place-items-center border border-[var(--line-strong)] bg-transparent p-16">
               <div className="h-full w-full max-w-80">
                 <SequencePreview
                   icon={icon}
@@ -1181,6 +1417,18 @@ function WorkshopEditor({
                   setIsPlaying(false);
                   setPlayheadMs(0);
                 }}
+              />
+              <IconButton
+                label="Undo sequence edit"
+                icon="undo"
+                disabled={sequenceHistory.past.length === 0}
+                onClick={undoSequenceEdit}
+              />
+              <IconButton
+                label="Redo sequence edit"
+                icon="redo"
+                disabled={sequenceHistory.future.length === 0}
+                onClick={redoSequenceEdit}
               />
               <div className="flex border border-[var(--line-strong)]">
                 <button
@@ -1284,25 +1532,45 @@ function WorkshopEditor({
 
             {!user ? (
               <div className="mt-4 grid gap-2">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="you@example.com"
-                  className="min-h-10 border border-[var(--line-strong)] bg-[var(--control)] px-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                />
                 <button
                   type="button"
-                  onClick={sendSignInLink}
-                  disabled={!supabase}
-                  className="min-h-10 bg-[var(--accent)] px-3 text-sm font-semibold text-[var(--active-ink)] disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => {
+                    setAccountTab("profile");
+                    setShowAccountModal(true);
+                  }}
+                  className="min-h-10 bg-[var(--accent)] px-3 text-sm font-semibold text-[var(--active-ink)] transition-colors hover:bg-[var(--active)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]"
                 >
-                  Send sign-in link
+                  Sign in to save
                 </button>
                 {authMessage && <p className="text-xs text-[var(--muted)]">{authMessage}</p>}
               </div>
             ) : (
               <div className="mt-4 space-y-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccountTab("profile");
+                    setShowAccountModal(true);
+                  }}
+                  className="w-full border border-[var(--line)] bg-[var(--background)] p-3 text-left transition-colors hover:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden border border-[var(--line-strong)] bg-[var(--control)] text-sm font-semibold text-[var(--foreground)]">
+                      {profileAvatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={profileAvatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        (profileName || user.email || "?").slice(0, 1).toUpperCase()
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                        {profileName || "Unnamed user"}
+                      </p>
+                      <p className="truncate text-xs text-[var(--muted)]">{user.email}</p>
+                    </div>
+                  </div>
+                </button>
                 <label className="flex flex-col gap-2 text-sm font-medium text-[var(--muted)]">
                   Project name
                   <input
@@ -1330,34 +1598,13 @@ function WorkshopEditor({
                   </button>
                 </div>
                 {projectMessage && <p className="text-xs text-[var(--muted)]">{projectMessage}</p>}
-                <div className="border border-[var(--line)]">
-                  <div className="border-b border-[var(--line)] p-3 text-xs font-semibold text-[var(--muted)]">
-                    Recent projects
-                  </div>
-                  <div className="max-h-56 overflow-y-auto">
-                    {projects.length === 0 ? (
-                      <p className="p-3 text-xs text-[var(--subtle)]">No saved projects yet.</p>
-                    ) : (
-                      projects.map((project) => (
-                        <button
-                          key={project.id}
-                          type="button"
-                          onClick={() => loadSavedProject(project)}
-                          className={`block w-full border-b border-[var(--line)] p-3 text-left text-xs transition-colors last:border-b-0 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--accent)] ${
-                            currentProjectId === project.id
-                              ? "bg-[var(--active)] text-[var(--active-ink)]"
-                              : "bg-[var(--background)] text-[var(--muted)] hover:bg-[var(--panel)] hover:text-[var(--foreground)]"
-                          }`}
-                        >
-                          <span className="block truncate font-semibold">{project.name}</span>
-                          <span className="mt-1 block truncate opacity-80">
-                            {project.icon_library} / {project.icon_name}
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowProjectsModal(true)}
+                  className="min-h-10 w-full border border-[var(--line-strong)] bg-[var(--control)] px-3 text-sm font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                >
+                  Past sequences ({projects.length})
+                </button>
               </div>
             )}
           </div>
@@ -1579,6 +1826,190 @@ function WorkshopEditor({
           )}
         </aside>
       </div>
+      {showAccountModal && (
+        <div className="fixed inset-0 z-[70] grid place-items-center bg-black/75 p-4">
+          <section className="w-full max-w-lg border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--foreground)]">
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--line)] p-5">
+              <div>
+                <h2 className="text-lg font-semibold">{user ? "Account" : "Sign in"}</h2>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  {user ? "Profile and session settings." : "Save this workshop after signing in."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAccountModal(false)}
+                className="relative grid h-9 w-9 place-items-center border border-[var(--line)] bg-[var(--background)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                aria-label="Close account"
+              >
+                <span className="absolute h-px w-4 rotate-45 bg-current" />
+                <span className="absolute h-px w-4 -rotate-45 bg-current" />
+              </button>
+            </div>
+
+            {user && (
+              <div className="grid grid-cols-2 border-b border-[var(--line)] text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setAccountTab("profile")}
+                  className={`min-h-10 ${accountTab === "profile" ? "bg-[var(--active)] text-[var(--active-ink)]" : "bg-[var(--control)] text-[var(--muted)] hover:text-[var(--foreground)]"}`}
+                >
+                  Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountTab("session")}
+                  className={`min-h-10 border-l border-[var(--line)] ${accountTab === "session" ? "bg-[var(--active)] text-[var(--active-ink)]" : "bg-[var(--control)] text-[var(--muted)] hover:text-[var(--foreground)]"}`}
+                >
+                  Session
+                </button>
+              </div>
+            )}
+
+            <div className="space-y-4 p-5">
+              {!user ? (
+                <>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    className="min-h-10 w-full border border-[var(--line-strong)] bg-[var(--control)] px-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={sendSignInLink}
+                    disabled={!supabase || isSendingLink}
+                    className="min-h-10 w-full bg-[var(--accent)] px-3 text-sm font-semibold text-[var(--active-ink)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {isSendingLink ? "Sending sign-in link..." : "Send sign-in link"}
+                  </button>
+                  {authMessage && <p className="text-xs text-[var(--muted)]">{authMessage}</p>}
+                </>
+              ) : accountTab === "profile" ? (
+                <>
+                  <label className="flex flex-col gap-2 text-sm font-medium text-[var(--muted)]">
+                    Display name
+                    <input
+                      value={profileName}
+                      onChange={(event) => setProfileName(event.target.value)}
+                      placeholder="Display name"
+                      className="min-h-10 border border-[var(--line-strong)] bg-[var(--control)] px-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm font-medium text-[var(--muted)]">
+                    Project name
+                    <input
+                      value={projectName}
+                      onChange={(event) => setProjectName(event.target.value)}
+                      placeholder="Project name"
+                      className="min-h-10 border border-[var(--line-strong)] bg-[var(--control)] px-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm font-medium text-[var(--muted)]">
+                    Avatar image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => uploadAvatar(event.target.files?.[0])}
+                      className="min-h-10 border border-[var(--line-strong)] bg-[var(--control)] px-3 py-2 text-sm text-[var(--foreground)] file:mr-3 file:border-0 file:bg-[var(--accent)] file:px-3 file:py-1 file:text-xs file:font-semibold file:text-[var(--active-ink)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    />
+                    <span className="text-xs text-[var(--subtle)]">
+                      {isUploadingAvatar ? "Uploading..." : "PNG, JPG, GIF, or WebP. Max 4 MB."}
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={updateProfile}
+                    disabled={isUpdatingProfile || isUploadingAvatar}
+                    className="min-h-10 w-full bg-[var(--accent)] px-3 text-sm font-semibold text-[var(--active-ink)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isUpdatingProfile ? "Updating profile..." : "Save profile"}
+                  </button>
+                  {profileMessage && <p className="text-xs text-[var(--muted)]">{profileMessage}</p>}
+                </>
+              ) : (
+                <>
+                  <div className="border border-[var(--line)] bg-[var(--background)] p-3 text-sm">
+                    <p className="font-semibold text-[var(--foreground)]">{user.email}</p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">Signed in to Blick cloud saves.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={signOut}
+                    className="min-h-10 w-full border border-[var(--line-strong)] bg-[var(--control)] px-3 text-sm font-semibold text-[var(--foreground)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  >
+                    Log out
+                  </button>
+                  <button
+                    type="button"
+                    onClick={deleteAccount}
+                    disabled={isDeletingAccount}
+                    className="min-h-10 w-full border border-red-500/60 bg-red-500/10 px-3 text-sm font-semibold text-red-200 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isDeletingAccount ? "Deleting account..." : "Delete account"}
+                  </button>
+                  {profileMessage && <p className="text-xs text-[var(--muted)]">{profileMessage}</p>}
+                </>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+      {showProjectsModal && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/75 p-4">
+          <section className="max-h-[86vh] w-full max-w-5xl overflow-hidden border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--foreground)]">
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--line)] p-5">
+              <div>
+                <h2 className="text-lg font-semibold">Past sequences</h2>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  Saved workshop projects from your account.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowProjectsModal(false)}
+                className="relative grid h-9 w-9 place-items-center border border-[var(--line)] bg-[var(--background)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                aria-label="Close past sequences"
+              >
+                <span className="absolute h-px w-4 rotate-45 bg-current" />
+                <span className="absolute h-px w-4 -rotate-45 bg-current" />
+              </button>
+            </div>
+
+            <div className="max-h-[calc(86vh-84px)] overflow-y-auto p-5">
+              {projects.length === 0 ? (
+                <div className="border border-[var(--line)] bg-[var(--background)] p-6 text-sm text-[var(--muted)]">
+                  No saved sequences yet.
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {projects.map((project) => (
+                    <button
+                      key={project.id}
+                      type="button"
+                      onClick={() => loadSavedProject(project)}
+                      className={`min-h-32 border p-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${
+                        currentProjectId === project.id
+                          ? "border-[var(--accent)] bg-[var(--active)] text-[var(--active-ink)]"
+                          : "border-[var(--line)] bg-[var(--background)] text-[var(--foreground)] hover:border-[var(--accent)]"
+                      }`}
+                    >
+                      <span className="block truncate text-sm font-semibold">{project.name}</span>
+                      <span className="mt-3 block truncate text-xs opacity-75">
+                        {project.icon_library} / {project.icon_name}
+                      </span>
+                      <span className="mt-5 block text-xs opacity-75">
+                        {Array.isArray(project.sequences) ? project.sequences.length : 0} sequences
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
       {deletedSequence && (
         <div className="fixed bottom-5 left-1/2 z-50 flex min-h-11 -translate-x-1/2 items-center gap-4 border border-[var(--line-strong)] bg-[var(--surface)] px-4 text-sm text-[var(--foreground)]">
           <span>{deletedSequence.sequence.name} deleted</span>

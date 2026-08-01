@@ -41,6 +41,18 @@ function escapeAttribute(value: string) {
     .replaceAll(">", "&gt;");
 }
 
+function escapeText(value: string) {
+  return escapeAttribute(value).replaceAll("'", "&#39;");
+}
+
+function safeCssColor(value: string) {
+  const trimmed = value.trim();
+  if (/^#[\da-f]{3,8}$/i.test(trimmed)) return trimmed;
+  if (/^(rgb|rgba|hsl|hsla)\([\d\s.,%+-]+\)$/i.test(trimmed)) return trimmed;
+  if (/^oklch\([\d\s.%+-]+(?:\/\s*[\d.]+)?\)$/i.test(trimmed)) return trimmed;
+  return "currentColor";
+}
+
 function fileSafeName(value: string) {
   return (
     value
@@ -193,7 +205,7 @@ export function buildCssExport(payload: ExportPayload) {
     )
     .join("\n");
 
-  return `.blick-svg{color:${payload.color};overflow:visible}
+  return `.blick-svg{color:${safeCssColor(payload.color)};overflow:visible}
 .blick-svg path{transform-box:fill-box;transform-origin:center}
 ${keyframes}
 ${classes}
@@ -218,9 +230,9 @@ function buildSvgShell(payload: ExportPayload, includeStyle: boolean, staticTime
   return `<svg class="blick-svg" xmlns="http://www.w3.org/2000/svg" viewBox="${escapeAttribute(
     icon.viewBox,
   )}" role="img" aria-label="${escapeAttribute(icon.name)}" style="color:${escapeAttribute(
-    payload.color,
+    safeCssColor(payload.color),
   )};overflow:visible">
-  <title>${escapeAttribute(icon.name)}</title>${includeStyle ? `\n  <style>\n${buildCssExport(payload)}\n  </style>` : ""}
+  <title>${escapeText(icon.name)}</title>${includeStyle ? `\n  <style>\n${buildCssExport(payload)}\n  </style>` : ""}
   ${paths}
 </svg>`;
 }
@@ -271,7 +283,7 @@ export function buildReactExport(payload: ExportPayload) {
       aria-label="${escapeAttribute(payload.icon.name)}"
       style={{ color, width: size, height: size }}
     >
-      <title>${payload.icon.name}</title>
+    <title>${escapeText(payload.icon.name)}</title>
       <style>{\`${buildCssExport(payload).replaceAll("`", "\\`").replaceAll("${", "\\${")}\`}</style>
       ${payload.icon.paths
         .map(

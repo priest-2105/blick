@@ -12,6 +12,18 @@ const DRAWABLE_TAGS = new Set([
   "ellipse",
 ]);
 
+const SAFE_PATH_ATTRS = new Set([
+  "d",
+  "stroke-width",
+  "stroke-linecap",
+  "stroke-linejoin",
+  "fill-rule",
+  "clip-rule",
+]);
+
+const SAFE_LINECAPS = new Set(["butt", "round", "square"]);
+const SAFE_LINEJOINS = new Set(["arcs", "bevel", "miter", "miter-clip", "round"]);
+
 function num(v: string | undefined, fallback = 0): number {
   const n = Number.parseFloat(v ?? "");
   return Number.isFinite(n) ? n : fallback;
@@ -72,6 +84,26 @@ function isInvisible(attrs: Record<string, string>): boolean {
   return attrs.stroke === "none" && (attrs.fill === "none" || attrs.fill === undefined);
 }
 
+function isSafeNumberList(value: string): boolean {
+  return /^[\d\s.,+\-eE]+$/.test(value);
+}
+
+function cleanPathAttrs(attrs: Record<string, string>, d: string): Record<string, string> {
+  const cleaned: Record<string, string> = { d };
+
+  for (const key of SAFE_PATH_ATTRS) {
+    const value = attrs[key];
+    if (!value) continue;
+    if (key === "d") continue;
+    if (key === "stroke-width" && !isSafeNumberList(value)) continue;
+    if (key === "stroke-linecap" && !SAFE_LINECAPS.has(value)) continue;
+    if (key === "stroke-linejoin" && !SAFE_LINEJOINS.has(value)) continue;
+    cleaned[key] = value;
+  }
+
+  return cleaned;
+}
+
 function collectDrawable(node: INode, out: INode[]): void {
   for (const child of node.children ?? []) {
     if (DRAWABLE_TAGS.has(child.name)) out.push(child);
@@ -117,25 +149,7 @@ export function normalizeSvg(svgRaw: string, computeLengths: boolean): Normalize
       }
     }
 
-    const attrs: Record<string, string> = { ...node.attributes, d };
-    delete attrs.cx;
-    delete attrs.cy;
-    delete attrs.r;
-    delete attrs.rx;
-    delete attrs.ry;
-    delete attrs.x1;
-    delete attrs.y1;
-    delete attrs.x2;
-    delete attrs.y2;
-    delete attrs.points;
-    if (node.name !== "rect") {
-      delete attrs.x;
-      delete attrs.y;
-      delete attrs.width;
-      delete attrs.height;
-    }
-
-    paths.push({ tag: "path", attrs, length });
+    paths.push({ tag: "path", attrs: cleanPathAttrs(node.attributes, d), length });
   }
 
   return { viewBox, paths };

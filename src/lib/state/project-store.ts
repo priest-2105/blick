@@ -8,6 +8,7 @@ interface WorkshopDraft {
   icon: IconMeta;
   color: string;
   sequences: unknown[];
+  activeSequenceId?: string | null;
 }
 
 interface ProjectState {
