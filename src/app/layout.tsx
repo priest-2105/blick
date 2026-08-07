@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import favicon from 'public/brand/blick-favicon.svg'
 
 const inter = Inter({
   subsets: ["latin"],
