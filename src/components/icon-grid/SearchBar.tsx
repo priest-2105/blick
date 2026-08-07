@@ -12,7 +12,7 @@ export default function SearchBar({
   return (
     <div className={`relative w-full ${className}`}>
       <svg
-        className="pointer-events-none absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]"
+        className="pointer-events-none absolute left-0 top-1/2 h-sp-6 w-sp-6 -translate-y-1/2 text-[var(--muted)]"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -28,7 +28,7 @@ export default function SearchBar({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Search icons..."
-        className="h-8 w-full border-0 bg-transparent py-0 pl-7 pr-2 text-sm font-medium text-[var(--foreground)] placeholder:text-[var(--subtle)] focus:outline-none"
+        className="h-sp-9 w-full border-0 bg-transparent py-0 pl-sp-8 pr-sp-4 text-label-sm font-medium text-[var(--foreground)] placeholder:text-[var(--subtle)] focus:outline-none"
       />
     </div>
   );

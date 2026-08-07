@@ -67,10 +67,10 @@ export default function ExportActions({
   };
 
   const triggerClass = fullWidth
-    ? "min-h-12 w-full border border-[var(--line-strong)] bg-[var(--control)] px-4 text-sm font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-    : "min-h-10 bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--active-ink)] transition-colors hover:bg-[var(--active)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]";
+    ? "min-h-sp-11 w-full rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-6 text-label-sm font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+    : "min-h-sp-10 rounded-sm bg-[var(--accent)] px-sp-6 text-label-sm font-semibold text-[var(--active-ink)] transition-colors hover:bg-[var(--active)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]";
   const buttonClass =
-    "min-h-11 border border-[var(--line-strong)] bg-[var(--control)] px-3 text-xs font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50";
+    "min-h-sp-11 rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-5 text-label-xs font-semibold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <>
@@ -84,23 +84,23 @@ export default function ExportActions({
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/75 p-4">
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/75 p-sp-6">
           <div className="relative grid max-h-[88vh] w-full max-w-5xl overflow-hidden border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--foreground)] md:grid-cols-[340px_minmax(0,1fr)]">
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center border border-[var(--line)] bg-[var(--background)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              className="absolute right-sp-5 top-sp-5 z-10 grid h-sp-10 w-sp-10 place-items-center rounded-sm border border-[var(--line)] bg-[var(--background)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
               aria-label="Close export"
             >
-              <span className="absolute h-px w-4 rotate-45 bg-current" />
-              <span className="absolute h-px w-4 -rotate-45 bg-current" />
+              <span className="absolute h-sp-1 w-sp-6 rotate-45 bg-current" />
+              <span className="absolute h-sp-1 w-sp-6 -rotate-45 bg-current" />
             </button>
 
-            <section className="border-b border-[var(--line)] p-5 pr-14 md:border-b-0 md:border-r">
-              <h2 className="text-lg font-semibold">Export</h2>
-              <p className="mt-1 truncate text-xs text-[var(--muted)]">{payload?.icon.name}</p>
+            <section className="border-b border-[var(--line)] p-sp-7 pr-sp-12 md:border-b-0 md:border-r">
+              <h2 className="text-label-lg font-semibold">Export</h2>
+              <p className="mt-sp-3 truncate text-label-xs text-[var(--muted)]">{payload?.icon.name}</p>
 
-              <div className="mt-5 grid grid-cols-2 gap-2">
+              <div className="mt-sp-7 grid grid-cols-2 gap-sp-4">
                 <button
                   type="button"
                   disabled={disabled}
@@ -143,45 +143,45 @@ export default function ExportActions({
                 </button>
               </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+              <div className="mt-sp-7 grid grid-cols-2 gap-sp-4">
+                <label className="flex flex-col gap-sp-3 text-label-xs font-medium text-[var(--muted)]">
                   Size
                   <select
                     value={size}
                     onChange={(event) => setSize(Number(event.target.value))}
-                    className="min-h-9 border border-[var(--line)] bg-[var(--background)] px-2 text-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    className="min-h-sp-10 rounded-sm border border-[var(--line)] bg-[var(--background)] px-sp-4 text-label-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   >
                     <option value={512}>512px</option>
                     <option value={768}>768px</option>
                     <option value={1024}>1024px</option>
                   </select>
                 </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+                <label className="flex flex-col gap-sp-3 text-label-xs font-medium text-[var(--muted)]">
                   FPS
                   <select
                     value={fps}
                     onChange={(event) => setFps(Number(event.target.value))}
-                    className="min-h-9 border border-[var(--line)] bg-[var(--background)] px-2 text-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    className="min-h-sp-10 rounded-sm border border-[var(--line)] bg-[var(--background)] px-sp-4 text-label-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   >
                     <option value={24}>24</option>
                     <option value={30}>30</option>
                     <option value={60}>60</option>
                   </select>
                 </label>
-                <label className="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+                <label className="flex flex-col gap-sp-3 text-label-xs font-medium text-[var(--muted)]">
                   Background
                   <input
                     value={backgroundColor}
                     onChange={(event) => setBackgroundColor(event.target.value)}
-                    className="min-h-9 border border-[var(--line)] bg-[var(--background)] px-2 text-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    className="min-h-sp-10 rounded-sm border border-[var(--line)] bg-[var(--background)] px-sp-4 text-label-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   />
                 </label>
-                <label className="flex min-h-9 items-center justify-between gap-3 self-end border border-[var(--line)] bg-[var(--background)] px-2 text-xs font-medium text-[var(--muted)]">
-                  <span className="inline-flex items-center gap-1">
+                <label className="flex min-h-sp-10 items-center justify-between gap-sp-5 self-end rounded-sm border border-[var(--line)] bg-[var(--background)] px-sp-4 text-label-xs font-medium text-[var(--muted)]">
+                  <span className="inline-flex items-center gap-sp-3">
                     Alpha
                     <span
                       title="Alpha means transparent background. GIF and WebM can use it; MP4 will use the background color."
-                      className="grid h-4 w-4 place-items-center border border-[var(--line)] text-[10px] text-[var(--foreground)]"
+                      className="grid h-sp-6 w-sp-6 place-items-center rounded-full border border-[var(--line)] text-[10px] text-[var(--foreground)]"
                     >
                       ?
                     </span>
@@ -190,23 +190,23 @@ export default function ExportActions({
                     type="checkbox"
                     checked={transparent}
                     onChange={(event) => setTransparent(event.target.checked)}
-                    className="h-4 w-4 accent-[var(--accent)]"
+                    className="h-sp-6 w-sp-6 accent-[var(--accent)]"
                   />
                 </label>
               </div>
 
-              {status && <p className="mt-4 text-xs leading-5 text-[var(--muted)]">{status}</p>}
+              {status && <p className="mt-sp-6 text-label-xs leading-5 text-[var(--muted)]">{status}</p>}
             </section>
 
-            <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] p-5">
-              <div className="mb-4 flex items-center justify-between gap-3 pr-10">
-                <div className="flex border border-[var(--line)]">
+            <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] p-sp-7">
+              <div className="mb-sp-6 flex items-center justify-between gap-sp-5 pr-sp-10">
+                <div className="flex rounded-sm border border-[var(--line)]">
                   {(["react", "css"] as const).map((item) => (
                     <button
                       key={item}
                       type="button"
                       onClick={() => setSnippet(item)}
-                      className={`min-h-9 px-4 text-xs font-semibold ${
+                      className={`min-h-sp-10 px-sp-6 text-label-xs font-semibold ${
                         snippet === item
                           ? "bg-[var(--active)] text-[var(--active-ink)]"
                           : "bg-[var(--control)] text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -220,13 +220,13 @@ export default function ExportActions({
                   type="button"
                   onClick={copySnippet}
                   disabled={!snippetCode}
-                  className="min-h-9 border border-[var(--line-strong)] bg-[var(--control)] px-3 text-xs font-semibold text-[var(--foreground)] hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] disabled:opacity-50"
+                  className="min-h-sp-10 rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-5 text-label-xs font-semibold text-[var(--foreground)] hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] disabled:opacity-50"
                 >
                   Copy code
                 </button>
               </div>
 
-              <pre className="min-h-0 overflow-auto border border-[var(--line)] bg-[var(--background)] p-4 text-xs leading-5 text-[var(--foreground)]">
+              <pre className="min-h-0 overflow-auto rounded-sm border border-[var(--line)] bg-[var(--background)] p-sp-6 text-label-xs leading-5 text-[var(--foreground)]">
                 <code>{snippetCode}</code>
               </pre>
             </section>

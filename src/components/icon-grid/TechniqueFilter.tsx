@@ -22,7 +22,7 @@ export default function TechniqueFilter({
           key={opt.id}
           type="button"
           onClick={() => onChange(opt.id)}
-          className={`border-r border-[var(--line)] px-3 py-2 text-xs font-bold transition-colors last:border-r-0 ${
+          className={`border-r border-[var(--line)] px-sp-5 py-sp-4 text-label-xs font-bold transition-colors last:border-r-0 ${
             value === opt.id
               ? "bg-[var(--active)] text-[var(--active-ink)]"
               : "text-[var(--muted)] hover:bg-[var(--panel)] hover:text-[var(--foreground)]"

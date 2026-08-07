@@ -138,18 +138,18 @@ export default function ColorPicker({
   const formattedValue = formatColor(color, format);
 
   return (
-    <div className="flex flex-col gap-3 text-[var(--foreground)]">
+    <div className="flex flex-col gap-sp-5 text-[var(--foreground)]">
       <HexColorPicker
         color={color}
         onChange={onChange}
         className="blick-color-picker"
         style={{ width: "100%" }}
       />
-      <div className="grid grid-cols-[92px_minmax(0,1fr)_48px] gap-2">
+      <div className="grid grid-cols-[var(--spacing-sp-14)_minmax(0,1fr)_var(--spacing-sp-11)] gap-sp-4">
         <select
           value={format}
           onChange={(event) => setFormat(event.target.value as ColorFormat)}
-          className="min-h-9 border border-[var(--line-strong)] bg-[var(--control)] px-2 text-xs font-medium text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+          className="min-h-sp-10 rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-4 text-label-xs font-medium text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
           aria-label="Color format"
         >
           {FORMATS.map((option) => (
@@ -165,25 +165,25 @@ export default function ColorPicker({
             const nextColor = parseColor(event.target.value, format);
             if (nextColor) onChange(nextColor);
           }}
-          className="min-h-9 min-w-0 border border-[var(--line-strong)] bg-[var(--background)] px-2 text-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+          className="min-h-sp-10 min-w-0 rounded-sm border border-[var(--line-strong)] bg-[var(--background)] px-sp-4 text-label-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
           aria-label={`${format.toUpperCase()} color value`}
         />
         <div
-          className="h-9 border border-[var(--line-strong)]"
+          className="h-sp-10 rounded-sm border border-[var(--line-strong)]"
           style={{ backgroundColor: color }}
           aria-hidden="true"
         />
       </div>
-      <p className="text-xs leading-5 text-[var(--muted)]">
+      <p className="text-label-xs leading-5 text-[var(--muted)]">
         {format.toUpperCase()} value: {formattedValue}
       </p>
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-sp-4">
         {PRESETS.map((preset) => (
           <button
             key={preset}
             type="button"
             onClick={() => onChange(preset)}
-            className={`h-8 border focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${
+            className={`h-sp-9 rounded-sm border focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${
               color.toLowerCase() === preset.toLowerCase()
                 ? "border-[var(--accent)]"
                 : "border-[var(--line)]"

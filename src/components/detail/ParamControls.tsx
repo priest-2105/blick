@@ -16,9 +16,9 @@ export default function ParamControls({
   onDurationChange: (ms: number) => void;
 }) {
   return (
-    <div className="flex flex-col gap-4">
-      <label className="flex flex-col gap-2 text-sm font-medium text-[var(--muted)]">
-        <span className="flex items-center justify-between gap-3">
+    <div className="flex flex-col gap-sp-6">
+      <label className="flex flex-col gap-sp-4 text-label-sm font-medium text-[var(--muted)]">
+        <span className="flex items-center justify-between gap-sp-5">
           Duration
           <span className="font-normal text-[var(--foreground)]">{durationMs}ms</span>
         </span>
@@ -29,19 +29,19 @@ export default function ParamControls({
           step={100}
           value={durationMs}
           onChange={(e) => onDurationChange(Number(e.target.value))}
-          className="h-2 w-full cursor-pointer accent-[var(--accent)]"
+          className="h-sp-4 w-full cursor-pointer accent-[var(--accent)]"
         />
       </label>
       {Object.entries(definition.paramsSchema).map(([key, schema]) => {
         const value = params[key] ?? schema.default;
         if (schema.type === "select") {
           return (
-            <label key={key} className="flex flex-col gap-2 text-sm font-medium text-[var(--muted)]">
+            <label key={key} className="flex flex-col gap-sp-4 text-label-sm font-medium text-[var(--muted)]">
               {schema.label}
               <select
                 value={String(value)}
                 onChange={(e) => onParamChange(key, e.target.value)}
-                className="min-h-11 border border-[var(--line-strong)] bg-[var(--control)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                className="min-h-sp-11 rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-5 py-sp-4 text-label-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
               >
                 {schema.options?.map((opt) => (
                   <option key={opt} value={opt}>
@@ -54,8 +54,8 @@ export default function ParamControls({
         }
         if (schema.type === "number") {
           return (
-            <label key={key} className="flex flex-col gap-2 text-sm font-medium text-[var(--muted)]">
-              <span className="flex items-center justify-between gap-3">
+            <label key={key} className="flex flex-col gap-sp-4 text-label-sm font-medium text-[var(--muted)]">
+              <span className="flex items-center justify-between gap-sp-5">
                 {schema.label}
                 <span className="font-normal text-[var(--foreground)]">{String(value)}</span>
               </span>
@@ -66,7 +66,7 @@ export default function ParamControls({
                 step={schema.step}
                 value={Number(value)}
                 onChange={(e) => onParamChange(key, Number(e.target.value))}
-                className="h-2 w-full cursor-pointer accent-[var(--accent)]"
+                className="h-sp-4 w-full cursor-pointer accent-[var(--accent)]"
               />
             </label>
           );

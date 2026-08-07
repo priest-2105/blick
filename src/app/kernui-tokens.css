@@ -1,0 +1,260 @@
+/*
+  Design tokens extracted from KernUI - Design System - Foundation v1.0 (Figma).
+  Source pages: "Spacing, Grids & Radius", "Typography", "Color & Semantics".
+
+  Registered under @theme so Tailwind v4 generates utilities automatically:
+  p-sp-4, gap-sp-8, rounded-xs, text-title-h1, bg-blue-500, etc.
+*/
+
+@theme {
+  /* ---- Spacing (sp-0 .. sp-16) ---- */
+  --spacing-sp-0: 0px;
+  --spacing-sp-1: 1px;
+  --spacing-sp-2: 2px;
+  --spacing-sp-3: 4px;
+  --spacing-sp-4: 8px;
+  --spacing-sp-5: 12px;
+  --spacing-sp-6: 16px;
+  --spacing-sp-7: 20px;
+  --spacing-sp-8: 24px;
+  --spacing-sp-9: 32px;
+  --spacing-sp-10: 40px;
+  --spacing-sp-11: 48px;
+  --spacing-sp-12: 64px;
+  --spacing-sp-13: 80px;
+  --spacing-sp-14: 96px;
+  --spacing-sp-15: 128px;
+  --spacing-sp-16: 256px;
+
+  /* ---- Radius ---- */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-xxl: 32px;
+  --radius-full: 999px;
+
+  /* ---- Breakpoints / grid frames ----
+     mobile 400px : 4 columns  / gutter 20px / margin 20px / type: stretch
+     tablet 768px : 8 columns  / gutter 24px / column width 60px / type: center
+     laptop 1024px: 12 columns / gutter 24px / column width 60px / type: center
+     desktop 1440px: 12 columns / gutter 24px / column width 94px / type: center
+  */
+  --breakpoint-mobile: 480px;
+  --breakpoint-tablet: 768px;
+  --breakpoint-laptop: 1024px;
+  --breakpoint-desktop: 1440px;
+
+  /* ---- Typography: font family ---- */
+  --font-kern: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* ---- Typography: Title scale (Regular 400 by default) ---- */
+  --text-title-h1: 72px;
+  --text-title-h1--line-height: 86px;
+  --text-title-h1--letter-spacing: 1%;
+
+  --text-title-h2: 60px;
+  --text-title-h2--line-height: 72px;
+  --text-title-h2--letter-spacing: 1%;
+
+  --text-title-h3: 48px;
+  --text-title-h3--line-height: 58px;
+  --text-title-h3--letter-spacing: 1%;
+
+  --text-title-h4: 36px;
+  --text-title-h4--line-height: 44px;
+  --text-title-h4--letter-spacing: 1%;
+
+  --text-title-h5: 30px;
+  --text-title-h5--line-height: 38px;
+  --text-title-h5--letter-spacing: 1%;
+
+  --text-title-h6: 24px;
+  --text-title-h6--line-height: 32px;
+  --text-title-h6--letter-spacing: 1%;
+
+  /* ---- Typography: Subheading scale (Medium 500) ---- */
+  --text-subheading-2xs: 11px;
+  --text-subheading-2xs--line-height: 12px;
+  --text-subheading-2xs--letter-spacing: 12%;
+
+  --text-subheading-xs: 12px;
+  --text-subheading-xs--line-height: 16px;
+  --text-subheading-xs--letter-spacing: 12%;
+
+  --text-subheading-sm: 14px;
+  --text-subheading-sm--line-height: 20px;
+  --text-subheading-sm--letter-spacing: 12%;
+
+  --text-subheading-md: 16px;
+  --text-subheading-md--line-height: 24px;
+  --text-subheading-md--letter-spacing: 12%;
+
+  --text-subheading-lg: 20px;
+  --text-subheading-lg--line-height: 32px;
+  --text-subheading-lg--letter-spacing: 24%;
+
+  /* ---- Typography: Label scale (Regular 400; Medium 500 variant uses same sizes) ---- */
+  --text-label-xs: 12px;
+  --text-label-xs--line-height: 16px;
+  --text-label-xs--letter-spacing: 2%;
+
+  --text-label-sm: 14px;
+  --text-label-sm--line-height: 20px;
+  --text-label-sm--letter-spacing: 2%;
+
+  --text-label-md: 16px;
+  --text-label-md--line-height: 24px;
+  --text-label-md--letter-spacing: 2%;
+
+  --text-label-lg: 18px;
+  --text-label-lg--line-height: 26px;
+  --text-label-lg--letter-spacing: 2%;
+
+  --text-label-xl: 24px;
+  --text-label-xl--line-height: 32px;
+  --text-label-xl--letter-spacing: 2%;
+
+  /* ---- Color: neutrals (grey) ---- */
+  --color-grey-25: #FAFAFA;
+  --color-grey-50: #F7F7F7;
+  --color-grey-100: #F5F5F5;
+  --color-grey-200: #EBEBEB;
+  --color-grey-300: #D1D1D1;
+  --color-grey-400: #A3A3A3;
+  --color-grey-500: #7B7B7B;
+  --color-grey-600: #5C5C5C;
+  --color-grey-700: #333333;
+  --color-grey-800: #292929;
+  --color-grey-900: #1C1C1C;
+  --color-grey-950: #171717;
+  --color-black: #000000;
+  --color-white: #ffffff;
+
+  /* ---- Color: blue (primary) ---- */
+  --color-blue-50: #EBF1FF;
+  --color-blue-100: #D5E2FF;
+  --color-blue-200: #C0D5FF;
+  --color-blue-300: #97BAFF;
+  --color-blue-400: #6895FF;
+  --color-blue-500: #335CFF;
+  --color-blue-600: #3559E9;
+  --color-blue-700: #2547D0;
+  --color-blue-800: #1F3BAD;
+  --color-blue-900: #182F8B;
+  --color-blue-950: #122368;
+
+  /* ---- Color: orange ---- */
+  --color-orange-50: #FFF3EB;
+  --color-orange-100: #FFE6D5;
+  --color-orange-200: #FFD9C0;
+  --color-orange-300: #FFC197;
+  --color-orange-400: #FFA468;
+  --color-orange-500: #FA7319;
+  --color-orange-600: #E16614;
+  --color-orange-700: #CE5E12;
+  --color-orange-800: #B75310;
+  --color-orange-900: #96440D;
+  --color-orange-950: #71330A;
+
+  /* ---- Color: sky (info) ---- */
+  --color-sky-50: #EBF8FF;
+  --color-sky-100: #D5F1FF;
+  --color-sky-200: #C0EAFF;
+  --color-sky-300: #97DCFF;
+  --color-sky-400: #68CDFF;
+  --color-sky-500: #47C2FF;
+  --color-sky-600: #35ADE9;
+  --color-sky-700: #2597D0;
+  --color-sky-800: #1F7EAD;
+  --color-sky-900: #18658B;
+  --color-sky-950: #124B68;
+
+  /* ---- Color: teal ---- */
+  --color-teal-50: #E4FBF8;
+  --color-teal-100: #D0FBF5;
+  --color-teal-200: #C2F5EE;
+  --color-teal-300: #84EBDD;
+  --color-teal-400: #3FDEC9;
+  --color-teal-500: #22D3BB;
+  --color-teal-600: #1DAF9C;
+  --color-teal-700: #178C7D;
+  --color-teal-800: #1A7569;
+  --color-teal-900: #16645A;
+  --color-teal-950: #0B463E;
+
+  /* ---- Color: green (success) ---- */
+  --color-green-50: #E0FAEC;
+  --color-green-100: #D0FBE9;
+  --color-green-200: #C2F5DA;
+  --color-green-300: #84EBB4;
+  --color-green-400: #3EE089;
+  --color-green-500: #1FC16B;
+  --color-green-600: #1DAF61;
+  --color-green-700: #178C4E;
+  --color-green-800: #1A7544;
+  --color-green-900: #16643B;
+  --color-green-950: #0B4627;
+
+  /* ---- Color: yellow (warning) ---- */
+  --color-yellow-50: #FFF4D6;
+  --color-yellow-100: #FFEFCC;
+  --color-yellow-200: #FFECC0;
+  --color-yellow-300: #FFE097;
+  --color-yellow-400: #FFD268;
+  --color-yellow-500: #F6B51E;
+  --color-yellow-600: #E6A819;
+  --color-yellow-700: #C99A2C;
+  --color-yellow-800: #A78025;
+  --color-yellow-900: #86661D;
+  --color-yellow-950: #624C18;
+
+  /* ---- Color: red (error/danger) ---- */
+  --color-red-50: #FFEBEC;
+  --color-red-100: #FFD5D8;
+  --color-red-200: #FFC0C5;
+  --color-red-300: #FF97A0;
+  --color-red-400: #FF6875;
+  --color-red-500: #FB3748;
+  --color-red-600: #E93544;
+  --color-red-700: #D02533;
+  --color-red-800: #AD1F2B;
+  --color-red-900: #8B1822;
+  --color-red-950: #681219;
+
+  /* ---- Color: pink ---- */
+  --color-pink-50: #FFEBF4;
+  --color-pink-100: #FFD5EA;
+  --color-pink-200: #FFC0DF;
+  --color-pink-300: #FF97CB;
+  --color-pink-400: #FF68B3;
+  --color-pink-500: #FB4BA3;
+  --color-pink-600: #E9358F;
+  --color-pink-700: #D0257A;
+  --color-pink-800: #AD1F66;
+  --color-pink-900: #8B1852;
+  --color-pink-950: #68123D;
+
+  /* ---- Color: purple ---- */
+  --color-purple-50: #EFEBFF;
+  --color-purple-100: #DCD5FF;
+  --color-purple-200: #CAC0FF;
+  --color-purple-300: #A897FF;
+  --color-purple-400: #8C71F6;
+  --color-purple-500: #7D52F4;
+  --color-purple-600: #693EE0;
+  --color-purple-700: #5B2CC9;
+  --color-purple-800: #4C25A7;
+  --color-purple-900: #3D1D86;
+  --color-purple-950: #351A75;
+
+  /* ---- Shadows / elevation ----
+     Each is a real DROP_SHADOW stack read off the Figma node effects. */
+  --shadow-xs: 0 2px 4px -1px rgba(0,0,0,0.02), 0 5px 13px -5px rgba(0,0,0,0.05);
+  --shadow-sm: 0 10px 20px 3px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 6px -2px rgba(0,0,0,0.03), 0 16px 24px -4px rgba(0,0,0,0.08);
+  --shadow-lg: 0 0px 3px -1px rgba(0,0,0,0.04), 0 14px 22px -9px rgba(0,0,0,0.14);
+  --shadow-xl: 0 8px 8px -4px rgba(0,0,0,0.03), 0 24px 32px -4px rgba(0,0,0,0.08);
+  --shadow-xxl: 0 32px 54px -12px rgba(0,0,0,0.18);
+}

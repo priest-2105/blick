@@ -2,7 +2,7 @@
 
 import type { IconLibrary } from "../../../types/icon";
 
-const LIBRARIES: Array<{ id: IconLibrary | "all"; label: string }> = [
+export const LIBRARIES: Array<{ id: IconLibrary | "all"; label: string }> = [
   { id: "all", label: "All libraries" },
   { id: "lucide", label: "Lucide" },
   { id: "tabler", label: "Tabler" },
@@ -26,7 +26,7 @@ export default function LibraryFilter({
           key={lib.id}
           type="button"
           onClick={() => onChange(lib.id)}
-          className={`border-b border-[var(--line)] px-0 py-3 text-left text-sm font-bold transition-colors ${
+          className={`border-b border-[var(--line)] px-0 py-sp-5 text-left text-label-sm font-bold transition-colors ${
             value === lib.id
               ? "text-[var(--accent)]"
               : "text-[var(--muted)] hover:text-[var(--foreground)]"

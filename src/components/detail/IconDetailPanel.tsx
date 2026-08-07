@@ -2,11 +2,13 @@
 
 import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import type { IconMeta, IconSearchEntry } from "../../../types/icon";
 import { loadIcon } from "@/lib/icons/load-icon";
 import { getAnimation, getAvailableAnimations } from "@/lib/animation/registry";
 import { singleSequencePayload } from "@/lib/export/animated-svg";
 import { useProjectStore } from "@/lib/state/project-store";
+import { createDraftId } from "@/lib/workshop/sequences";
 import ExportActions from "@/components/export/ExportActions";
 import LivePreview from "./LivePreview";
 import ColorPicker from "./ColorPicker";
@@ -84,156 +86,104 @@ export default function IconDetailPanel({
   const saveAndOpenWorkshop = () => {
     if (!icon) return;
     setIcon(icon);
-    router.push("/workshop");
+    router.push(`/workshop/${createDraftId()}`);
     onClose();
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-5"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-sp-6 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
     >
-      <div className="relative grid h-[min(760px,92vh)] w-full max-w-6xl overflow-hidden border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--foreground)] md:grid-cols-[minmax(420px,1.08fr)_minmax(360px,0.92fr)]">
+      <div className="relative flex max-h-[90vh] w-full max-w-sm flex-col overflow-hidden rounded-md border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--foreground)]">
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-3 top-3 z-20 grid h-9 w-9 place-items-center border border-[var(--line)] bg-[var(--background)] text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-          aria-label="Close icon details"
+          className="absolute right-sp-4 top-sp-4 z-20 grid h-sp-9 w-sp-9 place-items-center rounded-full text-[var(--muted)] transition-colors hover:bg-[var(--panel)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+          aria-label="Close"
         >
-          <span className="absolute h-px w-4 rotate-45 bg-current" />
-          <span className="absolute h-px w-4 -rotate-45 bg-current" />
+          <span className="absolute h-sp-1 w-sp-5 rotate-45 bg-current" />
+          <span className="absolute h-sp-1 w-sp-5 -rotate-45 bg-current" />
         </button>
 
         {!icon ? (
-          <div className="col-span-full grid place-items-center text-sm text-[var(--muted)]">
-            Loading icon...
+          <div className="grid min-h-40 place-items-center text-label-sm text-[var(--muted)]">
+            Loading...
           </div>
         ) : (
           <>
-            <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] border-b border-[var(--line)] bg-[var(--background)] md:border-b-0 md:border-r">
-              <header className="border-b border-[var(--line)] p-5 pr-16">
-                <p className="text-xs text-[var(--subtle)]">{icon.library}</p>
-                <h2
-                  id={titleId}
-                  className="mt-1 break-words text-2xl font-semibold leading-tight text-[var(--foreground)]"
-                >
+            <div className="grid place-items-center gap-sp-4 border-b border-[var(--line)] p-sp-8 pt-sp-9">
+              <div className="h-sp-14 w-sp-14">
+                <LivePreview
+                  icon={icon}
+                  color={color}
+                  animationId={definition?.id ?? "fade-in"}
+                  params={params}
+                  durationMs={durationMs}
+                />
+              </div>
+              <div className="text-center">
+                <h2 id={titleId} className="text-label-md font-semibold text-[var(--foreground)]">
                   {icon.name}
                 </h2>
-              </header>
+                <p className="text-label-xs text-[var(--subtle)]">{icon.library}</p>
+              </div>
+            </div>
 
-              <div className="grid min-h-0 place-items-center p-6 sm:p-8">
-                <div className="grid aspect-square w-full max-w-[420px] place-items-center border border-[var(--line-strong)] bg-[var(--panel)] p-12">
-                  <div className="h-full w-full max-w-64">
-                    <LivePreview
-                      icon={icon}
-                      color={color}
-                      animationId={definition?.id ?? "fade-in"}
+            <div className="min-h-0 space-y-sp-5 overflow-y-auto p-sp-6">
+              <ColorPicker color={color} onChange={setColor} />
+
+              {available.length === 0 ? (
+                <p className="text-label-xs leading-5 text-[var(--muted)]">
+                  No stroke paths available for this icon.
+                </p>
+              ) : (
+                <div className="space-y-sp-5">
+                  <label className="flex flex-col gap-sp-3 text-label-xs font-medium text-[var(--muted)]">
+                    Animation
+                    <select
+                      value={definition?.id}
+                      onChange={(e) => handleAnimationChange(e.target.value)}
+                      className="min-h-sp-10 rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-5 text-label-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    >
+                      {available.map((animation) => (
+                        <option key={animation.id} value={animation.id}>
+                          {animation.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {definition && (
+                    <ParamControls
+                      definition={definition}
                       params={params}
                       durationMs={durationMs}
+                      onParamChange={setParam}
+                      onDurationChange={setDurationMs}
                     />
-                  </div>
+                  )}
                 </div>
-              </div>
+              )}
+            </div>
 
-              <footer className="grid grid-cols-3 border-t border-[var(--line)] text-xs">
-                <div className="border-r border-[var(--line)] p-4">
-                  <p className="text-[var(--subtle)]">Type</p>
-                  <p className="mt-1 font-medium text-[var(--foreground)]">
-                    {icon.isStrokeBased ? "Stroke" : "Filled"}
-                  </p>
-                </div>
-                <div className="border-r border-[var(--line)] p-4">
-                  <p className="text-[var(--subtle)]">Paths</p>
-                  <p className="mt-1 font-medium text-[var(--foreground)]">{icon.paths.length}</p>
-                </div>
-                <div className="p-4">
-                  <p className="text-[var(--subtle)]">Cycle</p>
-                  <p className="mt-1 font-medium text-[var(--foreground)]">{durationMs}ms</p>
-                </div>
-              </footer>
-            </section>
-
-            <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]">
-              <header className="border-b border-[var(--line)] p-5 pr-14">
-                <p className="text-xs text-[var(--subtle)]">Style controls</p>
-                <h3 className="mt-1 text-xl font-semibold text-[var(--foreground)]">
-                  Tune animation
-                </h3>
-              </header>
-
-              <div className="min-h-0 overflow-y-auto p-4">
-                <div className="border border-[var(--line)]">
-                  <div className="border-b border-[var(--line)] p-3">
-                    <h4 className="text-sm font-semibold text-[var(--foreground)]">Color</h4>
-                  </div>
-                  <div className="p-3">
-                    <ColorPicker color={color} onChange={setColor} />
-                  </div>
-                </div>
-
-                <div className="mt-4 border border-[var(--line)]">
-                  <div className="border-b border-[var(--line)] p-3">
-                    <h4 className="text-sm font-semibold text-[var(--foreground)]">Animation</h4>
-                  </div>
-
-                  <div className="p-3">
-                    {available.length === 0 ? (
-                      <p className="border border-[var(--line)] bg-[var(--panel)] p-3 text-sm leading-6 text-[var(--muted)]">
-                        This filled icon does not expose stroke paths, so draw-on animation is not
-                        available yet.
-                      </p>
-                    ) : (
-                      <div className="space-y-4">
-                        <label className="flex flex-col gap-2 text-sm font-medium text-[var(--muted)]">
-                          Treatment
-                          <select
-                            value={definition?.id}
-                            onChange={(e) => handleAnimationChange(e.target.value)}
-                            className="min-h-10 border border-[var(--line-strong)] bg-[var(--control)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                          >
-                            {available.map((animation) => (
-                              <option key={animation.id} value={animation.id}>
-                                {animation.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        {definition && (
-                          <ParamControls
-                            definition={definition}
-                            params={params}
-                            durationMs={durationMs}
-                            onParamChange={setParam}
-                            onDurationChange={setDurationMs}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <footer className="border-t border-[var(--line-strong)] bg-[var(--background)] p-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={saveAndOpenWorkshop}
-                    className="min-h-12 bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--active-ink)] transition-colors hover:bg-[var(--active)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]"
-                  >
-                    Open in workshop
-                  </button>
-                  <ExportActions payload={exportPayload} label="Export" fullWidth />
-                </div>
-                <p className="mt-2 text-center text-xs leading-5 text-[var(--subtle)]">
-                  Export uses the icon, color, animation, and timing shown in this preview.
-                </p>
-              </footer>
-            </section>
+            <div className="grid grid-cols-2 gap-sp-4 border-t border-[var(--line)] p-sp-5">
+              <button
+                type="button"
+                onClick={saveAndOpenWorkshop}
+                className="min-h-sp-10 rounded-sm bg-[var(--accent)] px-sp-5 text-label-sm font-semibold text-[var(--active-ink)] transition-colors hover:bg-[var(--active)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]"
+              >
+                Open in workshop
+              </button>
+              <ExportActions payload={exportPayload} label="Export" fullWidth />
+            </div>
           </>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

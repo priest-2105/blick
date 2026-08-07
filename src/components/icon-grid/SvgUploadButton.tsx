@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { IconMeta } from "../../../types/icon";
 import { hasVisibleStroke, normalizeSvg } from "@/lib/icons/normalize-svg";
 import { useProjectStore } from "@/lib/state/project-store";
+import { createDraftId } from "@/lib/workshop/sequences";
 
 const MAX_FILE_SIZE = 1024 * 1024;
 
@@ -60,7 +61,7 @@ export default function SvgUploadButton() {
       setAnimationId(isStrokeBased ? "draw-on" : "fade-in");
       setDurationMs(isStrokeBased ? 1200 : 700);
       setStatus(null);
-      router.push("/workshop");
+      router.push(`/workshop/${createDraftId()}`);
     } catch {
       setStatus("Could not read that SVG.");
     } finally {
@@ -69,7 +70,7 @@ export default function SvgUploadButton() {
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-sp-5">
       <input
         ref={inputRef}
         type="file"
@@ -80,11 +81,11 @@ export default function SvgUploadButton() {
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="flex h-8 items-center border border-[var(--line-strong)] bg-[var(--control)] px-3 text-xs font-medium text-[var(--foreground)] transition-colors hover:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+        className="flex h-sp-9 items-center rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-5 text-label-xs font-medium text-[var(--foreground)] transition-colors hover:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
       >
         Upload SVG
       </button>
-      {status && <p className="hidden text-xs text-[var(--accent)] sm:block">{status}</p>}
+      {status && <p className="hidden text-label-xs text-[var(--accent)] sm:block">{status}</p>}
     </div>
   );
 }

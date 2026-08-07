@@ -5,6 +5,7 @@ import type { IconLibrary, IconSearchEntry } from "../../types/icon";
 import { loadPreviewIndex, loadSearchIndex } from "@/lib/icons/manifest";
 import { createIconSearcher } from "@/lib/icons/search";
 import IconGrid from "@/components/icon-grid/IconGrid";
+import LibraryBrowseView from "@/components/icon-grid/LibraryBrowseView";
 import SearchBar from "@/components/icon-grid/SearchBar";
 import Sidebar from "@/components/icon-grid/Sidebar";
 import SvgUploadButton from "@/components/icon-grid/SvgUploadButton";
@@ -58,42 +59,45 @@ export default function Home() {
     return results;
   }, [search, debouncedQuery, library, technique]);
 
+  const isDefaultBrowse =
+    debouncedQuery.trim().length === 0 && library === "all" && technique === "all";
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
-      <header className="grid min-h-32 border-b border-[var(--line)] md:grid-cols-[26%_12%_12%_12%_12%_1fr]">
-        <div className="flex min-h-32 items-start border-b border-[var(--line)] p-6 md:border-b-0 md:border-r">
+      <header className="grid min-h-sp-15 border-b border-[var(--line)] md:grid-cols-[26%_12%_12%_12%_12%_1fr]">
+        <div className="flex min-h-sp-15 items-start border-b border-[var(--line)] p-sp-8 md:border-b-0 md:border-r">
           <div>
-            <h1 className="font-[family-name:var(--font-panchang)] text-4xl font-extrabold leading-none tracking-normal text-[var(--foreground)]">
+            <h1 className="text-title-h4 font-extrabold leading-none tracking-normal text-[var(--foreground)]">
               Blick
-              <sup className="ml-1 align-super text-xs font-extrabold">TM</sup>
+              <sup className="ml-sp-3 align-super text-label-xs font-extrabold">TM</sup>
             </h1>
-            <p className="mt-3 max-w-48 text-xs leading-5 text-[var(--muted)]">
+            <p className="mt-sp-5 max-w-48 text-label-xs leading-5 text-[var(--muted)]">
               Animated icon library workspace
             </p>
           </div>
         </div>
 
-        <div className="hidden border-r border-[var(--line)] p-5 md:block">
-          <p className="text-sm font-bold">Icons</p>
-          <p className="mt-8 text-xs font-bold text-[var(--foreground)]">
+        <div className="hidden border-r border-[var(--line)] p-sp-7 md:block">
+          <p className="text-subheading-sm font-bold">Icons</p>
+          <p className="mt-sp-9 text-label-xs font-bold text-[var(--foreground)]">
             {filtered.length.toLocaleString()}
           </p>
         </div>
 
-        <div className="hidden bg-[var(--active)] p-5 text-[var(--active-ink)] md:block">
-          <p className="text-sm font-bold">Browse</p>
-          <p className="mt-8 text-xs font-bold">{fullEntries === null ? "Preview" : "Full"}</p>
+        <div className="hidden bg-[var(--active)] p-sp-7 text-[var(--active-ink)] md:block">
+          <p className="text-subheading-sm font-bold">Browse</p>
+          <p className="mt-sp-9 text-label-xs font-bold">{fullEntries === null ? "Preview" : "Full"}</p>
         </div>
 
-        <div className="hidden border-x border-[var(--line)] p-5 text-[var(--subtle)] md:block">
-          <p className="text-sm font-bold">Animate</p>
+        <div className="hidden border-x border-[var(--line)] p-sp-7 text-[var(--subtle)] md:block">
+          <p className="text-subheading-sm font-bold">Animate</p>
         </div>
 
-        <div className="hidden border-r border-[var(--line)] p-5 text-[var(--subtle)] md:block">
-          <p className="text-sm font-bold">Export</p>
+        <div className="hidden border-r border-[var(--line)] p-sp-7 text-[var(--subtle)] md:block">
+          <p className="text-subheading-sm font-bold">Export</p>
         </div>
 
-        <div className="flex items-start justify-end gap-5 p-5">
+        <div className="flex items-start justify-end gap-sp-7 p-sp-7">
           <SvgUploadButton />
         </div>
       </header>
@@ -107,16 +111,20 @@ export default function Home() {
         />
 
         <main className="min-w-0 flex-1 overflow-hidden border-r border-[var(--line)]">
-          <div className="flex h-12 items-center justify-between gap-4 border-b border-[var(--line)] px-4 text-xs text-[var(--muted)]">
+          <div className="flex h-sp-11 items-center justify-between gap-sp-6 border-b border-[var(--line)] px-sp-6 text-label-xs text-[var(--muted)]">
             <SearchBar value={query} onChange={setQuery} className="max-w-md" />
-            <div className="flex shrink-0 items-center gap-4">
+            <div className="flex shrink-0 items-center gap-sp-6">
               <span className="hidden sm:inline">
                 {selected ? `${selected.name} selected` : "No styles selected"}
               </span>
             </div>
           </div>
-          <div className="h-[calc(100%-3rem)]">
-            <IconGrid entries={filtered} onSelect={setSelected} />
+          <div className="h-[calc(100%-var(--spacing-sp-11))]">
+            {isDefaultBrowse ? (
+              <LibraryBrowseView entries={filtered} onSelect={setSelected} />
+            ) : (
+              <IconGrid entries={filtered} onSelect={setSelected} />
+            )}
           </div>
         </main>
       </div>
