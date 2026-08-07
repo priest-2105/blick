@@ -1,6 +1,7 @@
 "use client";
 
 import type { IconMeta } from "../../../types/icon";
+import RangeSlider from "@/components/ui/RangeSlider";
 import Glyph from "./Glyph";
 import IconButton from "./IconButton";
 import SequencePreview from "./SequencePreview";
@@ -122,15 +123,14 @@ export default function PreviewPane({
           </span>
         </div>
 
-        <input
-          type="range"
+        <RangeSlider
           min={0}
           max={Math.max(1, totalMs)}
           step={16}
           value={Math.min(playheadMs, totalMs)}
-          onChange={(event) => onScrub(Number(event.target.value))}
-          className="mb-sp-5 h-sp-4 w-full cursor-pointer accent-[var(--accent)]"
-          aria-label="Scrub animation timeline"
+          onChange={onScrub}
+          ariaLabel="Scrub animation timeline"
+          className="mb-sp-5"
         />
 
         <div className="relative flex h-sp-10 overflow-hidden rounded-sm border border-[var(--line)]">

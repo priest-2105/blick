@@ -10,6 +10,7 @@ import { singleSequencePayload } from "@/lib/export/animated-svg";
 import { useProjectStore } from "@/lib/state/project-store";
 import { createDraftId } from "@/lib/workshop/sequences";
 import ExportActions from "@/components/export/ExportActions";
+import Select from "@/components/ui/Select";
 import LivePreview from "./LivePreview";
 import ColorPicker from "./ColorPicker";
 import ParamControls from "./ParamControls";
@@ -117,8 +118,8 @@ export default function IconDetailPanel({
           </div>
         ) : (
           <>
-            <div className="grid place-items-center gap-sp-4 border-b border-[var(--line)] p-sp-8 pt-sp-9">
-              <div className="h-sp-14 w-sp-14">
+            <div className="flex flex-col items-center gap-sp-5 border-b border-[var(--line)] p-sp-7">
+              <div className="h-sp-16 w-sp-16">
                 <LivePreview
                   icon={icon}
                   color={color}
@@ -127,17 +128,18 @@ export default function IconDetailPanel({
                   durationMs={durationMs}
                 />
               </div>
-              <div className="text-center">
+              <div className="w-full text-center">
                 <h2 id={titleId} className="text-label-md font-semibold text-[var(--foreground)]">
                   {icon.name}
                 </h2>
                 <p className="text-label-xs text-[var(--subtle)]">{icon.library}</p>
               </div>
+              <div className="w-full">
+                <ColorPicker color={color} onChange={setColor} />
+              </div>
             </div>
 
             <div className="min-h-0 space-y-sp-5 overflow-y-auto p-sp-6">
-              <ColorPicker color={color} onChange={setColor} />
-
               {available.length === 0 ? (
                 <p className="text-label-xs leading-5 text-[var(--muted)]">
                   No stroke paths available for this icon.
@@ -146,17 +148,17 @@ export default function IconDetailPanel({
                 <div className="space-y-sp-5">
                   <label className="flex flex-col gap-sp-3 text-label-xs font-medium text-[var(--muted)]">
                     Animation
-                    <select
-                      value={definition?.id}
-                      onChange={(e) => handleAnimationChange(e.target.value)}
-                      className="min-h-sp-10 rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-5 text-label-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    <Select
+                      value={definition?.id ?? ""}
+                      onChange={handleAnimationChange}
+                      ariaLabel="Animation"
                     >
                       {available.map((animation) => (
                         <option key={animation.id} value={animation.id}>
                           {animation.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
                   {definition && (
                     <ParamControls

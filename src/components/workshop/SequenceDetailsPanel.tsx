@@ -4,6 +4,8 @@ import type { IconMeta } from "../../../types/icon";
 import type { AnimationDefinition } from "@/lib/animation/types";
 import { getAnimation } from "@/lib/animation/registry";
 import ParamControls from "@/components/detail/ParamControls";
+import RangeSlider from "@/components/ui/RangeSlider";
+import Select from "@/components/ui/Select";
 import type { GlyphName } from "./Glyph";
 import IconButton from "./IconButton";
 import {
@@ -88,24 +90,24 @@ export default function SequenceDetailsPanel({
 
       <label className="flex flex-col gap-sp-4 text-label-sm font-medium text-[var(--muted)]">
         Animation
-        <select
+        <Select
           value={activeSequence.animationId}
-          onChange={(event) => {
-            const definition = getAnimation(event.target.value);
+          onChange={(value) => {
+            const definition = getAnimation(value);
             onUpdateSequence(activeSequence.id, {
-              animationId: event.target.value,
+              animationId: value,
               durationMs: definition?.defaultDurationMs ?? activeSequence.durationMs,
               params: defaultParams(definition),
             });
           }}
-          className="min-h-sp-10 rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-5 text-label-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+          ariaLabel="Animation"
         >
           {availableAnimations.map((animation) => (
             <option key={animation.id} value={animation.id}>
               {animation.name}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
 
       <div className="space-y-sp-4">
@@ -147,14 +149,13 @@ export default function SequenceDetailsPanel({
           Delay before start
           <span className="text-[var(--foreground)]">{activeSequence.delayMs}ms</span>
         </span>
-        <input
-          type="range"
+        <RangeSlider
           min={0}
           max={2000}
           step={100}
           value={activeSequence.delayMs}
-          onChange={(event) => onUpdateSequence(activeSequence.id, { delayMs: Number(event.target.value) })}
-          className="h-sp-4 cursor-pointer accent-[var(--accent)]"
+          onChange={(delayMs) => onUpdateSequence(activeSequence.id, { delayMs })}
+          ariaLabel="Delay before start"
         />
       </label>
 

@@ -1,6 +1,8 @@
 "use client";
 
 import type { AnimationDefinition } from "@/lib/animation/types";
+import RangeSlider from "@/components/ui/RangeSlider";
+import Select from "@/components/ui/Select";
 
 export default function ParamControls({
   definition,
@@ -22,14 +24,13 @@ export default function ParamControls({
           Duration
           <span className="font-normal text-[var(--foreground)]">{durationMs}ms</span>
         </span>
-        <input
-          type="range"
+        <RangeSlider
           min={300}
           max={3000}
           step={100}
           value={durationMs}
-          onChange={(e) => onDurationChange(Number(e.target.value))}
-          className="h-sp-4 w-full cursor-pointer accent-[var(--accent)]"
+          onChange={onDurationChange}
+          ariaLabel="Duration"
         />
       </label>
       {Object.entries(definition.paramsSchema).map(([key, schema]) => {
@@ -38,17 +39,17 @@ export default function ParamControls({
           return (
             <label key={key} className="flex flex-col gap-sp-4 text-label-sm font-medium text-[var(--muted)]">
               {schema.label}
-              <select
+              <Select
                 value={String(value)}
-                onChange={(e) => onParamChange(key, e.target.value)}
-                className="min-h-sp-11 rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-5 py-sp-4 text-label-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                onChange={(next) => onParamChange(key, next)}
+                ariaLabel={schema.label}
               >
                 {schema.options?.map((opt) => (
                   <option key={opt} value={opt}>
                     {opt}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           );
         }
@@ -59,14 +60,13 @@ export default function ParamControls({
                 {schema.label}
                 <span className="font-normal text-[var(--foreground)]">{String(value)}</span>
               </span>
-              <input
-                type="range"
-                min={schema.min}
-                max={schema.max}
+              <RangeSlider
+                min={schema.min ?? 0}
+                max={schema.max ?? 100}
                 step={schema.step}
                 value={Number(value)}
-                onChange={(e) => onParamChange(key, Number(e.target.value))}
-                className="h-sp-4 w-full cursor-pointer accent-[var(--accent)]"
+                onChange={(next) => onParamChange(key, next)}
+                ariaLabel={schema.label}
               />
             </label>
           );

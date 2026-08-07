@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HexColorPicker } from "react-colorful";
+import Select from "@/components/ui/Select";
 
 type ColorFormat = "hex" | "rgb" | "hsl";
 
-const PRESETS = ["#f5f5d1", "#d9ff00", "#ffffff", "#ff4f88", "#45d7ff", "#11130f", "#7affb2"];
 const FORMATS: Array<{ id: ColorFormat; label: string }> = [
   { id: "hex", label: "HEX" },
   { id: "rgb", label: "RGB" },
@@ -135,64 +135,84 @@ export default function ColorPicker({
   onChange: (color: string) => void;
 }) {
   const [format, setFormat] = useState<ColorFormat>("hex");
+  const [open, setOpen] = useState(false);
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
   const formattedValue = formatColor(color, format);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const positionPopover = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPopoverPos({ top: rect.bottom + 8, left: rect.left });
+    };
+    positionPopover();
+
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (popoverRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+
+    window.addEventListener("resize", positionPopover);
+    window.addEventListener("scroll", positionPopover, true);
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("resize", positionPopover);
+      window.removeEventListener("scroll", positionPopover, true);
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   return (
-    <div className="flex flex-col gap-sp-5 text-[var(--foreground)]">
-      <HexColorPicker
-        color={color}
-        onChange={onChange}
-        className="blick-color-picker"
-        style={{ width: "100%" }}
+    <div className="flex items-center justify-between gap-sp-5">
+      <span className="text-label-xs font-medium text-[var(--muted)]">Color</span>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-label="Choose color"
+        aria-expanded={open}
+        className="h-sp-9 w-sp-9 shrink-0 rounded-full border-2 border-[var(--line-strong)] shadow-[var(--shadow-xs)] transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2"
+        style={{ backgroundColor: color }}
       />
-      <div className="grid grid-cols-[var(--spacing-sp-14)_minmax(0,1fr)_var(--spacing-sp-11)] gap-sp-4">
-        <select
-          value={format}
-          onChange={(event) => setFormat(event.target.value as ColorFormat)}
-          className="min-h-sp-10 rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-4 text-label-xs font-medium text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-          aria-label="Color format"
-        >
-          {FORMATS.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <input
-          key={`${format}-${color}`}
-          defaultValue={formattedValue}
-          onChange={(event) => {
-            const nextColor = parseColor(event.target.value, format);
-            if (nextColor) onChange(nextColor);
-          }}
-          className="min-h-sp-10 min-w-0 rounded-sm border border-[var(--line-strong)] bg-[var(--background)] px-sp-4 text-label-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-          aria-label={`${format.toUpperCase()} color value`}
-        />
+
+      {open && (
         <div
-          className="h-sp-10 rounded-sm border border-[var(--line-strong)]"
-          style={{ backgroundColor: color }}
-          aria-hidden="true"
-        />
-      </div>
-      <p className="text-label-xs leading-5 text-[var(--muted)]">
-        {format.toUpperCase()} value: {formattedValue}
-      </p>
-      <div className="grid grid-cols-7 gap-sp-4">
-        {PRESETS.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            onClick={() => onChange(preset)}
-            className={`h-sp-9 rounded-sm border focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${
-              color.toLowerCase() === preset.toLowerCase()
-                ? "border-[var(--accent)]"
-                : "border-[var(--line)]"
-            }`}
-            style={{ backgroundColor: preset }}
-            aria-label={preset}
-          />
-        ))}
-      </div>
+          ref={popoverRef}
+          style={{ top: popoverPos.top, left: popoverPos.left }}
+          className="fixed z-[80] flex w-64 flex-col gap-sp-4 rounded-md border border-[var(--line-strong)] bg-[var(--surface)] p-sp-5 shadow-[var(--shadow-lg)]"
+        >
+          <HexColorPicker color={color} onChange={onChange} className="blick-color-picker" style={{ width: "100%" }} />
+          <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-sp-4">
+            <Select value={format} onChange={(value) => setFormat(value as ColorFormat)} ariaLabel="Color format">
+              {FORMATS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+            <input
+              key={`${format}-${color}`}
+              defaultValue={formattedValue}
+              onChange={(event) => {
+                const nextColor = parseColor(event.target.value, format);
+                if (nextColor) onChange(nextColor);
+              }}
+              className="min-h-sp-10 min-w-0 rounded-sm border border-[var(--line-strong)] bg-[var(--background)] px-sp-4 text-label-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              aria-label={`${format.toUpperCase()} color value`}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

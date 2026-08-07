@@ -9,6 +9,7 @@ import {
   downloadHtmlExport,
   exportRasterAnimation,
 } from "@/lib/export/animated-svg";
+import Select from "@/components/ui/Select";
 
 type CodeSnippet = "react" | "css";
 
@@ -146,27 +147,19 @@ export default function ExportActions({
               <div className="mt-sp-7 grid grid-cols-2 gap-sp-4">
                 <label className="flex flex-col gap-sp-3 text-label-xs font-medium text-[var(--muted)]">
                   Size
-                  <select
-                    value={size}
-                    onChange={(event) => setSize(Number(event.target.value))}
-                    className="min-h-sp-10 rounded-sm border border-[var(--line)] bg-[var(--background)] px-sp-4 text-label-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                  >
+                  <Select value={size} onChange={(value) => setSize(Number(value))} ariaLabel="Export size">
                     <option value={512}>512px</option>
                     <option value={768}>768px</option>
                     <option value={1024}>1024px</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className="flex flex-col gap-sp-3 text-label-xs font-medium text-[var(--muted)]">
                   FPS
-                  <select
-                    value={fps}
-                    onChange={(event) => setFps(Number(event.target.value))}
-                    className="min-h-sp-10 rounded-sm border border-[var(--line)] bg-[var(--background)] px-sp-4 text-label-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                  >
+                  <Select value={fps} onChange={(value) => setFps(Number(value))} ariaLabel="Export FPS">
                     <option value={24}>24</option>
                     <option value={30}>30</option>
                     <option value={60}>60</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className="flex flex-col gap-sp-3 text-label-xs font-medium text-[var(--muted)]">
                   Background
