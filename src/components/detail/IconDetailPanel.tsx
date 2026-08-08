@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, useAnimationControls } from "framer-motion";
 import type { IconMeta, IconSearchEntry } from "../../../types/icon";
 import { loadIcon } from "@/lib/icons/load-icon";
 import { getAnimation, getAvailableAnimations } from "@/lib/animation/registry";
@@ -41,12 +41,23 @@ export default function IconDetailPanel({
   const entryKey = `${entry.library}:${entry.name}`;
   const icon = loadedIcon?.key === entryKey ? loadedIcon.data : null;
   const titleId = useId();
+  const shakeControls = useAnimationControls();
+
+  const shakePanel = () => {
+    void shakeControls.start({
+      x: [0, -10, 10, -8, 8, -4, 4, 0],
+      transition: { duration: 0.4, ease: "easeInOut" },
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
-    loadIcon(entry.library, entry.name).then((data) => {
-      if (!cancelled) setLoadedIcon({ key: `${entry.library}:${entry.name}`, data });
-    });
+    loadIcon(entry.library, entry.name).then(
+      (data) => {
+        if (!cancelled) setLoadedIcon({ key: `${entry.library}:${entry.name}`, data });
+      },
+      () => {},
+    );
     return () => {
       cancelled = true;
     };
@@ -96,12 +107,17 @@ export default function IconDetailPanel({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.15 }}
+      onClick={shakePanel}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-sp-6 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
     >
-      <div className="relative flex max-h-[90vh] w-full max-w-sm flex-col overflow-hidden rounded-md border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--foreground)]">
+      <motion.div
+        onClick={(event) => event.stopPropagation()}
+        animate={shakeControls}
+        className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-md border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--foreground)]"
+      >
         <button
           type="button"
           onClick={onClose}
@@ -185,7 +201,7 @@ export default function IconDetailPanel({
             </div>
           </>
         )}
-      </div>
+      </motion.div>
     </motion.div>
   );
 }

@@ -14,7 +14,11 @@ export type GlyphName =
   | "center"
   | "reverse"
   | "undo"
-  | "redo";
+  | "redo"
+  | "user"
+  | "cloud"
+  | "close"
+  | "shield";
 
 export default function Glyph({
   name,
@@ -50,5 +54,9 @@ export default function Glyph({
   if (name === "reverse") return <svg {...common}><path d="M7 7h10v4" /><path d="M17 17H7v-4" /><path d="M17 7l-4-4" /><path d="M7 17l4 4" /></svg>;
   if (name === "undo") return <svg {...common}><path d="M9 14 4 9l5-5" /><path d="M4 9h10a6 6 0 0 1 0 12h-2" /></svg>;
   if (name === "redo") return <svg {...common}><path d="m15 14 5-5-5-5" /><path d="M20 9H10a6 6 0 0 0 0 12h2" /></svg>;
+  if (name === "user") return <svg {...common}><circle cx="12" cy="8" r="4" /><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>;
+  if (name === "cloud") return <svg {...common}><path d="M7 18h11a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.7 9.1 4.5 4.5 0 0 0 7 18z" /></svg>;
+  if (name === "close") return <svg {...common}><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>;
+  if (name === "shield") return <svg {...common}><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /></svg>;
   return <svg {...common}><path d="M12 5v14" /><path d="M5 12h14" /></svg>;
 }

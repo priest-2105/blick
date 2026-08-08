@@ -8,7 +8,11 @@ export function loadIcon(library: IconLibrary, name: string): Promise<IconMeta> 
   const key = `${library}:${name}`;
   let entry = cache.get(key);
   if (!entry) {
-    entry = fetch(`/icons-full/${library}/${name}.json`).then((res) => res.json());
+    entry = fetch(`/icons-full/${library}/${name}.json`).then((res) => {
+      if (!res.ok) throw new Error(`Failed to load icon: ${library}/${name}`);
+      return res.json();
+    });
+    entry.catch(() => cache.delete(key));
     cache.set(key, entry);
   }
   return entry;

@@ -67,9 +67,10 @@ export default function Home() {
       <header className="grid min-h-sp-15 border-b border-[var(--line)] md:grid-cols-[26%_12%_12%_12%_12%_1fr]">
         <div className="flex min-h-sp-15 items-start border-b border-[var(--line)] p-sp-8 md:border-b-0 md:border-r">
           <div>
-            <h1 className="text-title-h4 font-extrabold leading-none tracking-normal text-[var(--foreground)]">
-              Blick
-              <sup className="ml-sp-3 align-super text-label-xs font-extrabold">TM</sup>
+            <h1 className="flex items-center leading-none">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/blick-logo.svg" alt="Blick" className="h-sp-6 w-auto" />
+              <sup className="ml-sp-3 align-super text-label-xs font-extrabold text-[var(--foreground)]">TM</sup>
             </h1>
             <p className="mt-sp-5 max-w-48 text-label-xs leading-5 text-[var(--muted)]">
               Animated icon library workspace

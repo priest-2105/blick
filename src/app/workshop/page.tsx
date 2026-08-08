@@ -9,13 +9,12 @@ import { getAnimation, getAvailableAnimations } from "@/lib/animation/registry";
 import { useProjectStore } from "@/lib/state/project-store";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { listSavedProjects, saveProject, type SavedProject } from "@/lib/supabase/projects";
+import { AnimatePresence } from "framer-motion";
 import WorkshopHeader from "@/components/workshop/WorkshopHeader";
 import SequenceRailPanel from "@/components/workshop/SequenceRailPanel";
 import PreviewPane from "@/components/workshop/PreviewPane";
-import WorkshopSavePanel from "@/components/workshop/WorkshopSavePanel";
 import SequenceDetailsPanel from "@/components/workshop/SequenceDetailsPanel";
-import AccountModal from "@/components/workshop/AccountModal";
-import ProjectsModal from "@/components/workshop/ProjectsModal";
+import WorkshopProfileModal, { type ProfileModalTab } from "@/components/workshop/WorkshopProfileModal";
 import {
   createDraftId,
   createInitialSequences,
@@ -43,34 +42,19 @@ export default function WorkshopPage() {
   const { icon, color, workshopDraft, clearWorkshopDraft, loadWorkshopDraft } = useProjectStore();
   const [restoreAttempted, setRestoreAttempted] = useState(false);
   const [queryDraftId, setQueryDraftId] = useState<string | null>(null);
-  const [hasAuthCode, setHasAuthCode] = useState<boolean | null>(null);
-  const localDraftId = getDraftIdFromPath(pathname) ?? queryDraftId;
+  const pathDraftId = getDraftIdFromPath(pathname);
+  const localDraftId = pathDraftId ?? queryDraftId;
 
   useEffect(() => {
-    const timeout = window.setTimeout(
-      () => setHasAuthCode(new URLSearchParams(window.location.search).has("code")),
-      0,
-    );
-    return () => window.clearTimeout(timeout);
-  }, []);
-
-  useEffect(() => {
-    if (hasAuthCode === null || !hasAuthCode || queryDraftId) return;
+    if (pathDraftId || queryDraftId) return;
     const timeout = window.setTimeout(() => setQueryDraftId(readLastLocalDraftId()), 0);
     return () => window.clearTimeout(timeout);
-  }, [hasAuthCode, queryDraftId]);
+  }, [pathDraftId, queryDraftId]);
 
   useEffect(() => {
-    if (hasAuthCode === null) return;
-    if (!localDraftId || icon || restoreAttempted) {
-      if (!localDraftId && hasAuthCode && !restoreAttempted) {
-        const timeout = window.setTimeout(() => setRestoreAttempted(true), 0);
-        return () => window.clearTimeout(timeout);
-      }
-      if (!localDraftId && !hasAuthCode && !restoreAttempted) {
-        const timeout = window.setTimeout(() => setRestoreAttempted(true), 0);
-        return () => window.clearTimeout(timeout);
-      }
+    if (icon || restoreAttempted) return;
+    if (!localDraftId) {
+      setRestoreAttempted(true);
       return;
     }
     const draft = readLocalDraft(localDraftId);
@@ -85,11 +69,10 @@ export default function WorkshopPage() {
         activeSequenceId: draft.activeSequenceId,
       });
     }
-    const timeout = window.setTimeout(() => setRestoreAttempted(true), 0);
-    return () => window.clearTimeout(timeout);
-  }, [hasAuthCode, icon, loadWorkshopDraft, localDraftId, restoreAttempted]);
+    setRestoreAttempted(true);
+  }, [icon, loadWorkshopDraft, localDraftId, restoreAttempted]);
 
-  if (!icon && (hasAuthCode === null || localDraftId || hasAuthCode) && !restoreAttempted) {
+  if (!icon && !restoreAttempted) {
     return (
       <main className="grid min-h-screen place-items-center bg-[var(--background)] p-sp-6 text-[var(--foreground)]">
         <div className="border border-[var(--line)] bg-[var(--surface)] p-sp-6 text-label-sm text-[var(--muted)]">
@@ -118,24 +101,22 @@ export default function WorkshopPage() {
     );
   }
 
+  const pendingDraft: PendingWorkshopDraft | null = workshopDraft
+    ? {
+        projectId: workshopDraft.projectId,
+        localDraftId: workshopDraft.localDraftId ?? localDraftId,
+        name: workshopDraft.name,
+        sequences: workshopDraft.sequences,
+        activeSequenceId: workshopDraft.activeSequenceId,
+      }
+    : null;
+
   return (
     <WorkshopEditor
       key={`${workshopDraft?.projectId ?? workshopDraft?.localDraftId ?? localDraftId ?? "draft"}-${icon.library}-${icon.name}-${icon.paths.length}`}
       icon={icon}
       color={color}
-      pendingDraft={
-        workshopDraft
-          ? {
-              projectId: workshopDraft.projectId,
-              localDraftId: workshopDraft.localDraftId ?? localDraftId,
-              name: workshopDraft.name,
-              sequences: workshopDraft.sequences,
-              activeSequenceId: workshopDraft.activeSequenceId,
-            }
-          : localDraftId
-            ? { localDraftId, sequences: [] }
-            : null
-      }
+      pendingDraft={pendingDraft}
       onDraftConsumed={clearWorkshopDraft}
     />
   );
@@ -181,10 +162,8 @@ function WorkshopEditor({
   const [projectName, setProjectName] = useState(pendingDraft?.name ?? icon.name);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(pendingDraft?.projectId ?? null);
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
-  const [showSavePanel, setShowSavePanel] = useState(false);
-  const [showAccountModal, setShowAccountModal] = useState(false);
-  const [showProjectsModal, setShowProjectsModal] = useState(false);
-  const [accountTab, setAccountTab] = useState<"profile" | "session">("profile");
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileModalTab, setProfileModalTab] = useState<ProfileModalTab>("cloud");
   const [localDraftId] = useState(() => pendingDraft?.localDraftId ?? createDraftId());
   const [profileName, setProfileName] = useState("");
   const [profileAvatarUrl, setProfileAvatarUrl] = useState("");
@@ -193,8 +172,14 @@ function WorkshopEditor({
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [notice, setNotice] = useState<string | null>(null);
+  const lastSavedSignatureRef = useRef<string | null>(null);
+  const projectNameRef = useRef(projectName);
+  useEffect(() => {
+    projectNameRef.current = projectName;
+  }, [projectName]);
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const loadWorkshopDraft = useProjectStore((state) => state.loadWorkshopDraft);
 
@@ -239,6 +224,25 @@ function WorkshopEditor({
     return () => window.clearTimeout(timeout);
   }, [deletedSequence]);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timeout = window.setTimeout(() => setNotice(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("authError");
+    if (!error) return;
+    setAuthMessage(error);
+    setProfileModalTab("cloud");
+    setShowProfileModal(true);
+    params.delete("authError");
+    const nextSearch = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const refreshProjects = useCallback(async (currentUser: User | null, options?: { silent?: boolean }) => {
     if (!currentUser) {
       setProjects([]);
@@ -267,13 +271,30 @@ function WorkshopEditor({
     });
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       const nextUser = session?.user ?? null;
       setUser(nextUser);
-      setProfileName((nextUser?.user_metadata?.display_name as string | undefined) ?? "");
-      setProfileAvatarUrl((nextUser?.user_metadata?.avatar_url as string | undefined) ?? "");
-      if (nextUser) setShowSavePanel(true);
+      const nextDisplayName = (nextUser?.user_metadata?.display_name as string | undefined) ?? "";
+      const nextAvatarUrl = (nextUser?.user_metadata?.avatar_url as string | undefined) ?? "";
+      setProfileName(nextDisplayName);
+      setProfileAvatarUrl(nextAvatarUrl);
       void refreshProjects(nextUser, { silent: true });
+
+      if (event === "SIGNED_IN" && nextUser) {
+        const complete =
+          projectNameRef.current.trim().length > 0 &&
+          nextDisplayName.trim().length > 0 &&
+          nextAvatarUrl.trim().length > 0;
+        if (complete) {
+          setProfileModalTab("cloud");
+        } else {
+          setProfileModalTab("profile");
+          setShowProfileModal(true);
+          setProfileMessage("Add a display name, avatar, and project name to start autosaving to your account.");
+        }
+      } else if (event === "SIGNED_OUT") {
+        setNotice("Signed out — this workshop now saves locally only.");
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -291,10 +312,11 @@ function WorkshopEditor({
     }
 
     setIsSendingLink(true);
+    const next = encodeURIComponent(`/workshop/${localDraftId}`);
     const { error } = await supabase.auth.signInWithOtp({
       email: trimmedEmail,
       options: {
-        emailRedirectTo: `${window.location.origin}/workshop/${encodeURIComponent(localDraftId)}`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${next}`,
       },
     });
     setIsSendingLink(false);
@@ -370,7 +392,7 @@ function WorkshopEditor({
     await supabase?.auth.signOut();
     setUser(null);
     setProjects([]);
-    setShowAccountModal(false);
+    setShowProfileModal(false);
   };
 
   const signOut = async () => {
@@ -381,33 +403,9 @@ function WorkshopEditor({
     setProjectMessage(null);
   };
 
-  const handleSaveProject = async () => {
-    if (!user) {
-      writeLocalDraft({
-        id: localDraftId,
-        projectId: currentProjectId,
-        name: projectName,
-        icon,
-        color,
-        sequences,
-        activeSequenceId,
-        updatedAt: new Date().toISOString(),
-      });
-      setShowSavePanel(true);
-      setShowAccountModal(true);
-      setAuthMessage("Sign in to save this project.");
-      return;
-    }
-
-    setShowSavePanel(true);
-    if (!isProfileComplete()) {
-      setAccountTab("profile");
-      setShowAccountModal(true);
-      setProfileMessage("Add a display name, avatar, and project name before saving.");
-      return;
-    }
-
-    setIsSaving(true);
+  const performSave = useCallback(async () => {
+    if (!user) return;
+    setSaveStatus("saving");
     const result = await saveProject({
       id: currentProjectId,
       user,
@@ -416,19 +414,46 @@ function WorkshopEditor({
       color,
       sequences,
     });
-    setIsSaving(false);
 
     if (result.error) {
+      setSaveStatus("error");
       setProjectMessage(result.error);
       return;
     }
 
     if (result.project) {
       setCurrentProjectId(result.project.id);
-      setProjectName(result.project.name);
-      setProjectMessage("Saved.");
-      await refreshProjects(user);
+      setSaveStatus("saved");
+      void refreshProjects(user, { silent: true });
     }
+  }, [color, currentProjectId, icon, projectName, refreshProjects, sequences, user]);
+
+  useEffect(() => {
+    if (!user || !isProfileComplete()) return;
+    const signature = JSON.stringify({ name: projectName, color, sequences });
+    if (signature === lastSavedSignatureRef.current) return;
+
+    const timeout = window.setTimeout(() => {
+      lastSavedSignatureRef.current = signature;
+      void performSave();
+    }, 1200);
+    return () => window.clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, projectName, profileName, profileAvatarUrl, color, sequences, performSave]);
+
+  const handleSaveNow = () => {
+    if (!isProfileComplete()) {
+      setProfileModalTab("profile");
+      setProfileMessage("Add a display name, avatar, and project name to enable saving.");
+      return;
+    }
+    lastSavedSignatureRef.current = JSON.stringify({ name: projectName, color, sequences });
+    void performSave();
+  };
+
+  const openProfileModal = () => {
+    setShowProfileModal(true);
+    if (!user) setProfileModalTab("cloud");
   };
 
   const loadSavedProject = (project: SavedProject) => {
@@ -441,7 +466,7 @@ function WorkshopEditor({
       sequences: project.sequences,
       activeSequenceId: null,
     });
-    setShowProjectsModal(false);
+    setShowProfileModal(false);
   };
 
   const undoSequenceEdit = () => {
@@ -633,7 +658,14 @@ function WorkshopEditor({
 
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
-      <WorkshopHeader icon={icon} sequenceCount={sequences.length} />
+      <WorkshopHeader
+        icon={icon}
+        sequenceCount={sequences.length}
+        user={user}
+        profileAvatarUrl={profileAvatarUrl}
+        profileName={profileName}
+        onOpenProfile={openProfileModal}
+      />
 
       <div className="grid min-h-0 flex-1 md:grid-cols-[280px_minmax(0,1fr)_390px]">
         <SequenceRailPanel
@@ -681,29 +713,6 @@ function WorkshopEditor({
         />
 
         <aside className="min-h-0 overflow-y-auto bg-[var(--surface)]">
-          <WorkshopSavePanel
-            showSavePanel={showSavePanel}
-            user={user}
-            supabaseConfigured={Boolean(supabase)}
-            authMessage={authMessage}
-            profileAvatarUrl={profileAvatarUrl}
-            profileName={profileName}
-            projectName={projectName}
-            onProjectNameChange={setProjectName}
-            onSave={handleSaveProject}
-            isSaving={isSaving}
-            currentProjectId={currentProjectId}
-            onRefresh={() => refreshProjects(user)}
-            isRefreshing={isRefreshing}
-            projectMessage={projectMessage}
-            projectCount={projects.length}
-            onOpenProjects={() => setShowProjectsModal(true)}
-            onOpenAccount={() => {
-              setAccountTab("profile");
-              setShowAccountModal(true);
-            }}
-            onSignOut={signOut}
-          />
           {activeSequence && activeDefinition ? (
             <SequenceDetailsPanel
               icon={icon}
@@ -725,40 +734,48 @@ function WorkshopEditor({
         </aside>
       </div>
 
-      {showAccountModal && (
-        <AccountModal
-          user={user}
-          onClose={() => setShowAccountModal(false)}
-          accountTab={accountTab}
-          onAccountTabChange={setAccountTab}
-          email={email}
-          onEmailChange={setEmail}
-          authMessage={authMessage}
-          isSendingLink={isSendingLink}
-          onSendSignInLink={sendSignInLink}
-          supabaseConfigured={Boolean(supabase)}
-          profileName={profileName}
-          onProfileNameChange={setProfileName}
-          projectName={projectName}
-          onProjectNameChange={setProjectName}
-          onUploadAvatar={uploadAvatar}
-          isUploadingAvatar={isUploadingAvatar}
-          onUpdateProfile={updateProfile}
-          isUpdatingProfile={isUpdatingProfile}
-          profileMessage={profileMessage}
-          onSignOut={signOut}
-          onDeleteAccount={deleteAccount}
-          isDeletingAccount={isDeletingAccount}
-        />
-      )}
+      <AnimatePresence>
+        {showProfileModal && (
+          <WorkshopProfileModal
+            onClose={() => setShowProfileModal(false)}
+            activeTab={profileModalTab}
+            onTabChange={setProfileModalTab}
+            user={user}
+            supabaseConfigured={Boolean(supabase)}
+            email={email}
+            onEmailChange={setEmail}
+            authMessage={authMessage}
+            isSendingLink={isSendingLink}
+            onSendSignInLink={sendSignInLink}
+            profileAvatarUrl={profileAvatarUrl}
+            profileName={profileName}
+            onProfileNameChange={setProfileName}
+            projectName={projectName}
+            onProjectNameChange={setProjectName}
+            onUploadAvatar={uploadAvatar}
+            isUploadingAvatar={isUploadingAvatar}
+            onUpdateProfile={updateProfile}
+            isUpdatingProfile={isUpdatingProfile}
+            profileMessage={profileMessage}
+            saveStatus={saveStatus}
+            saveMessage={projectMessage}
+            onSaveNow={handleSaveNow}
+            currentProjectId={currentProjectId}
+            projects={projects}
+            onSelectProject={loadSavedProject}
+            onRefreshProjects={() => refreshProjects(user)}
+            isRefreshingProjects={isRefreshing}
+            onSignOut={signOut}
+            onDeleteAccount={deleteAccount}
+            isDeletingAccount={isDeletingAccount}
+          />
+        )}
+      </AnimatePresence>
 
-      {showProjectsModal && (
-        <ProjectsModal
-          projects={projects}
-          currentProjectId={currentProjectId}
-          onClose={() => setShowProjectsModal(false)}
-          onSelectProject={loadSavedProject}
-        />
+      {notice && (
+        <div className="fixed right-sp-7 top-sp-7 z-[80] max-w-xs border border-[var(--line-strong)] bg-[var(--surface)] px-sp-6 py-sp-5 text-label-sm text-[var(--foreground)]">
+          {notice}
+        </div>
       )}
 
       {deletedSequence && (

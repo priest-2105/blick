@@ -29,7 +29,7 @@ interface ProjectState {
 
 export const useProjectStore = create<ProjectState>((set) => ({
   icon: null,
-  color: "#ffffff",
+  color: "#707070",
   animationId: "draw-on",
   params: { easing: "ease-out" },
   durationMs: 1200,

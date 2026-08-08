@@ -19,9 +19,12 @@ export default function IconCard({
 
   useEffect(() => {
     let cancelled = false;
-    loadIcon(entry.library, entry.name).then((icon) => {
-      if (!cancelled) setIcon(icon);
-    });
+    loadIcon(entry.library, entry.name).then(
+      (icon) => {
+        if (!cancelled) setIcon(icon);
+      },
+      () => {},
+    );
     return () => {
       cancelled = true;
     };
