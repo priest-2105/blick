@@ -11,6 +11,8 @@ import Sidebar from "@/components/icon-grid/Sidebar";
 import SvgUploadButton from "@/components/icon-grid/SvgUploadButton";
 import type { Technique } from "@/components/icon-grid/TechniqueFilter";
 import IconDetailPanel from "@/components/detail/IconDetailPanel";
+import HelpModal from "@/components/help/HelpModal";
+import Glyph from "@/components/workshop/Glyph";
 
 function useDebounced<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -30,6 +32,7 @@ export default function Home() {
   const [library, setLibrary] = useState<IconLibrary | "all">("all");
   const [technique, setTechnique] = useState<Technique>("all");
   const [selected, setSelected] = useState<IconSearchEntry | null>(null);
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   const debouncedQuery = useDebounced(query, 200);
 
@@ -98,8 +101,17 @@ export default function Home() {
           <p className="text-subheading-sm font-bold">Export</p>
         </div>
 
-        <div className="flex items-start justify-end gap-sp-7 p-sp-7">
+        <div className="flex items-start justify-end gap-sp-5 p-sp-7">
           <SvgUploadButton />
+          <button
+            type="button"
+            onClick={() => setShowHelpModal(true)}
+            title="Help"
+            aria-label="Open help"
+            className="grid h-sp-9 w-sp-9 shrink-0 place-items-center rounded-sm border border-[var(--line-strong)] bg-[var(--control)] text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+          >
+            <Glyph name="help" className="h-sp-5 w-sp-5" />
+          </button>
         </div>
       </header>
 
@@ -131,6 +143,7 @@ export default function Home() {
       </div>
 
       {selected && <IconDetailPanel entry={selected} onClose={() => setSelected(null)} />}
+      {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
     </div>
   );
 }

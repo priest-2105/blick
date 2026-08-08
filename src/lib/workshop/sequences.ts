@@ -253,15 +253,24 @@ export function pushSequenceHistory(
   };
 }
 
-export function sequenceEnd(sequence: AnimationSequence) {
+/** Minimal shape needed for timeline math, so callers outside the workshop
+ * (e.g. the export preview, working with `ExportSequence`) can reuse this
+ * logic without duplicating it or depending on the full `AnimationSequence`. */
+export interface TimedSequence {
+  id: string;
+  delayMs: number;
+  durationMs: number;
+}
+
+export function sequenceEnd(sequence: TimedSequence) {
   return sequence.delayMs + sequence.durationMs;
 }
 
-export function timelineDuration(sequences: AnimationSequence[]) {
+export function timelineDuration(sequences: TimedSequence[]) {
   return sequences.reduce((total, sequence) => total + sequenceEnd(sequence), 0);
 }
 
-export function sequenceOffsets(sequences: AnimationSequence[]) {
+export function sequenceOffsets(sequences: TimedSequence[]) {
   return sequences.reduce<Array<{ id: string; start: number; end: number }>>((offsets, sequence) => {
     const previousEnd = offsets.at(-1)?.end ?? 0;
     const start = previousEnd + sequence.delayMs;

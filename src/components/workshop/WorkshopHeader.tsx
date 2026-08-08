@@ -10,6 +10,7 @@ export default function WorkshopHeader({
   profileAvatarUrl,
   profileName,
   onOpenProfile,
+  onOpenHelp,
 }: {
   icon: IconMeta;
   sequenceCount: number;
@@ -17,6 +18,7 @@ export default function WorkshopHeader({
   profileAvatarUrl: string;
   profileName: string;
   onOpenProfile: () => void;
+  onOpenHelp: () => void;
 }) {
   return (
     <header className="grid min-h-sp-15 border-b border-[var(--line)] md:grid-cols-[26%_12%_12%_12%_1fr]">
@@ -48,24 +50,35 @@ export default function WorkshopHeader({
           <p>{icon.library}</p>
           <p className="mt-sp-4 truncate text-[var(--foreground)]">{icon.name}</p>
         </div>
-        <button
-          type="button"
-          onClick={onOpenProfile}
-          title={user ? profileName || user.email || "Profile" : "Sign in"}
-          aria-label="Open profile"
-          className="grid h-sp-11 w-sp-11 shrink-0 place-items-center overflow-hidden rounded-full border border-[var(--line-strong)] bg-[var(--control)] text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-        >
-          {user && profileAvatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={profileAvatarUrl} alt="" className="h-full w-full object-cover" />
-          ) : user ? (
-            <span className="text-label-sm font-semibold">
-              {(profileName || user.email || "?").slice(0, 1).toUpperCase()}
-            </span>
-          ) : (
-            <Glyph name="user" className="h-sp-6 w-sp-6" />
-          )}
-        </button>
+        <div className="flex shrink-0 items-center gap-sp-4">
+          <button
+            type="button"
+            onClick={onOpenHelp}
+            title="Help"
+            aria-label="Open help"
+            className="grid h-sp-11 w-sp-11 place-items-center rounded-full border border-[var(--line-strong)] bg-[var(--control)] text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+          >
+            <Glyph name="help" className="h-sp-6 w-sp-6" />
+          </button>
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            title={user ? profileName || user.email || "Profile" : "Sign in"}
+            aria-label="Open profile"
+            className="grid h-sp-11 w-sp-11 place-items-center overflow-hidden rounded-full border border-[var(--line-strong)] bg-[var(--control)] text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+          >
+            {user && profileAvatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profileAvatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : user ? (
+              <span className="text-label-sm font-semibold">
+                {(profileName || user.email || "?").slice(0, 1).toUpperCase()}
+              </span>
+            ) : (
+              <Glyph name="user" className="h-sp-6 w-sp-6" />
+            )}
+          </button>
+        </div>
       </div>
     </header>
   );

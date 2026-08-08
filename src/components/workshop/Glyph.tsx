@@ -19,7 +19,9 @@ export type GlyphName =
   | "cloud"
   | "close"
   | "shield"
-  | "edit";
+  | "edit"
+  | "check"
+  | "help";
 
 export default function Glyph({
   name,
@@ -60,5 +62,7 @@ export default function Glyph({
   if (name === "close") return <svg {...common}><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>;
   if (name === "shield") return <svg {...common}><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /></svg>;
   if (name === "edit") return <svg {...common}><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>;
+  if (name === "check") return <svg {...common}><path d="M20 6 9 17l-5-5" /></svg>;
+  if (name === "help") return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M9.3 9a2.7 2.7 0 0 1 5.2.9c0 1.8-2.7 2.2-2.7 4" /><path d="M12 17h.01" /></svg>;
   return <svg {...common}><path d="M12 5v14" /><path d="M5 12h14" /></svg>;
 }

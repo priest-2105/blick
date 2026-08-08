@@ -53,7 +53,7 @@ function safeCssColor(value: string) {
   return "currentColor";
 }
 
-function fileSafeName(value: string) {
+export function fileSafeName(value: string) {
   return (
     value
       .toLowerCase()
@@ -315,12 +315,14 @@ export function downloadBlob(blob: Blob, fileName: string) {
   URL.revokeObjectURL(url);
 }
 
-export function downloadAnimatedSvg(payload: ExportPayload) {
-  downloadTextFile(buildAnimatedSvg(payload), `${fileSafeName(payload.icon.name)}-animated.svg`, "image/svg+xml;charset=utf-8");
+export function downloadAnimatedSvg(payload: ExportPayload, fileName?: string) {
+  const base = fileName ? fileSafeName(fileName) : fileSafeName(payload.icon.name);
+  downloadTextFile(buildAnimatedSvg(payload), `${base}-animated.svg`, "image/svg+xml;charset=utf-8");
 }
 
-export function downloadHtmlExport(payload: ExportPayload) {
-  downloadTextFile(buildHtmlExport(payload), `${fileSafeName(payload.icon.name)}-animated.html`, "text/html;charset=utf-8");
+export function downloadHtmlExport(payload: ExportPayload, fileName?: string) {
+  const base = fileName ? fileSafeName(fileName) : fileSafeName(payload.icon.name);
+  downloadTextFile(buildHtmlExport(payload), `${base}-animated.html`, "text/html;charset=utf-8");
 }
 
 export function downloadReactExport(payload: ExportPayload) {
@@ -358,6 +360,13 @@ async function svgToPngFrame(svg: string, options: RasterExportOptions) {
   }
 }
 
+export interface ExportProgress {
+  phase: "loading" | "rendering" | "encoding";
+  /** 0-1 within the current phase. */
+  progress: number;
+  message: string;
+}
+
 async function loadFfmpeg() {
   const [{ FFmpeg }] = await Promise.all([import("@ffmpeg/ffmpeg")]);
   const ffmpeg = new FFmpeg();
@@ -372,11 +381,22 @@ export async function exportRasterAnimation(
   payload: ExportPayload,
   format: "gif" | "mp4" | "webm",
   options: RasterExportOptions,
-  onProgress?: (message: string) => void,
+  onProgress?: (progress: ExportProgress) => void,
+  fileName?: string,
 ) {
+  onProgress?.({ phase: "loading", progress: 0, message: "Loading FFmpeg" });
   const durationMs = Math.max(1, timelineDuration(payload.sequences));
   const totalFrames = Math.max(2, Math.ceil((durationMs / 1000) * options.fps));
   const ffmpeg = await loadFfmpeg();
+
+  const handleEncodeProgress = ({ progress }: { progress: number }) => {
+    onProgress?.({
+      phase: "encoding",
+      progress: Math.min(1, Math.max(0, progress)),
+      message: `Encoding ${format.toUpperCase()}`,
+    });
+  };
+  ffmpeg.on("progress", handleEncodeProgress);
 
   try {
     for (let frame = 0; frame < totalFrames; frame += 1) {
@@ -387,7 +407,11 @@ export async function exportRasterAnimation(
         transparent: format === "mp4" ? false : options.transparent,
       });
       await ffmpeg.writeFile(`frame-${String(frame).padStart(4, "0")}.png`, png);
-      onProgress?.(`Rendered ${frame + 1}/${totalFrames} frames`);
+      onProgress?.({
+        phase: "rendering",
+        progress: (frame + 1) / totalFrames,
+        message: `Rendering frame ${frame + 1}/${totalFrames}`,
+      });
     }
 
     const output = `blick-output.${format}`;
@@ -404,15 +428,17 @@ export async function exportRasterAnimation(
           ? [...common, "-pix_fmt", "yuv420p", "-movflags", "faststart", output]
           : [...common, "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", output];
 
-    onProgress?.(`Encoding ${format.toUpperCase()}`);
+    onProgress?.({ phase: "encoding", progress: 0, message: `Encoding ${format.toUpperCase()}` });
     await ffmpeg.exec(args);
     const data = await ffmpeg.readFile(output);
     const rawBytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
     const bytes = new Uint8Array(rawBytes.byteLength);
     bytes.set(rawBytes);
     const mime = format === "gif" ? "image/gif" : format === "mp4" ? "video/mp4" : "video/webm";
-    downloadBlob(new Blob([bytes], { type: mime }), `${fileSafeName(payload.icon.name)}-animated.${format}`);
+    const base = fileName ? fileSafeName(fileName) : fileSafeName(payload.icon.name);
+    downloadBlob(new Blob([bytes], { type: mime }), `${base}-animated.${format}`);
   } finally {
+    ffmpeg.off("progress", handleEncodeProgress);
     ffmpeg.terminate();
   }
 }

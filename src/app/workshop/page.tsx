@@ -16,6 +16,7 @@ import PreviewPane from "@/components/workshop/PreviewPane";
 import SequenceDetailsPanel from "@/components/workshop/SequenceDetailsPanel";
 import WorkshopProfileModal, { type ProfileModalTab } from "@/components/workshop/WorkshopProfileModal";
 import SignInModal from "@/components/auth/SignInModal";
+import HelpModal from "@/components/help/HelpModal";
 import {
   createDraftId,
   createInitialSequences,
@@ -168,6 +169,7 @@ function WorkshopEditor({
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState<ProfileModalTab>("cloud");
   const [localDraftId] = useState(() => pendingDraft?.localDraftId ?? createDraftId());
   const [profileName, setProfileName] = useState("");
@@ -694,6 +696,7 @@ function WorkshopEditor({
         profileAvatarUrl={profileAvatarUrl}
         profileName={profileName}
         onOpenProfile={openProfileModal}
+        onOpenHelp={() => setShowHelpModal(true)}
       />
 
       <div className="flex border-b border-[var(--line)] md:hidden">
@@ -831,6 +834,7 @@ function WorkshopEditor({
           />
         )}
         {showSignInModal && <SignInModal onClose={() => setShowSignInModal(false)} />}
+        {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
       </AnimatePresence>
 
       {notice && (
