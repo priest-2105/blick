@@ -17,5 +17,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}${next}?authError=${encodeURIComponent(error.message)}`);
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  const separator = next.includes("?") ? "&" : "?";
+  return NextResponse.redirect(`${origin}${next}${separator}signedIn=1`);
 }

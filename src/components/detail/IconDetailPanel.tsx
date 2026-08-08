@@ -8,7 +8,7 @@ import { loadIcon } from "@/lib/icons/load-icon";
 import { getAnimation, getAvailableAnimations } from "@/lib/animation/registry";
 import { singleSequencePayload } from "@/lib/export/animated-svg";
 import { useProjectStore } from "@/lib/state/project-store";
-import { createDraftId } from "@/lib/workshop/sequences";
+import { createDefaultSequences, createDraftId, writeLocalDraft } from "@/lib/workshop/sequences";
 import ExportActions from "@/components/export/ExportActions";
 import Select from "@/components/ui/Select";
 import LivePreview from "./LivePreview";
@@ -42,6 +42,7 @@ export default function IconDetailPanel({
   const icon = loadedIcon?.key === entryKey ? loadedIcon.data : null;
   const titleId = useId();
   const shakeControls = useAnimationControls();
+  const [isOpeningWorkshop, setIsOpeningWorkshop] = useState(false);
 
   const shakePanel = () => {
     void shakeControls.start({
@@ -96,10 +97,21 @@ export default function IconDetailPanel({
       : null;
 
   const saveAndOpenWorkshop = () => {
-    if (!icon) return;
+    if (!icon || isOpeningWorkshop) return;
+    setIsOpeningWorkshop(true);
     setIcon(icon);
-    router.push(`/workshop/${createDraftId()}`);
-    onClose();
+    const draftId = createDraftId();
+    writeLocalDraft({
+      id: draftId,
+      projectId: null,
+      name: icon.name,
+      icon,
+      color,
+      sequences: createDefaultSequences(icon),
+      activeSequenceId: null,
+      updatedAt: new Date().toISOString(),
+    });
+    router.push(`/workshop/${draftId}`);
   };
 
   return (
@@ -193,9 +205,10 @@ export default function IconDetailPanel({
               <button
                 type="button"
                 onClick={saveAndOpenWorkshop}
-                className="min-h-sp-10 rounded-sm bg-[var(--accent)] px-sp-5 text-label-sm font-semibold text-[var(--active-ink)] transition-colors hover:bg-[var(--active)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]"
+                disabled={isOpeningWorkshop}
+                className="min-h-sp-10 rounded-sm bg-[var(--accent)] px-sp-5 text-label-sm font-semibold text-[var(--active-ink)] transition-colors hover:bg-[var(--active)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-70"
               >
-                Open in workshop
+                {isOpeningWorkshop ? "Opening..." : "Open in workshop"}
               </button>
               <ExportActions payload={exportPayload} label="Export" fullWidth />
             </div>

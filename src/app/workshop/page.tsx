@@ -15,6 +15,7 @@ import SequenceRailPanel from "@/components/workshop/SequenceRailPanel";
 import PreviewPane from "@/components/workshop/PreviewPane";
 import SequenceDetailsPanel from "@/components/workshop/SequenceDetailsPanel";
 import WorkshopProfileModal, { type ProfileModalTab } from "@/components/workshop/WorkshopProfileModal";
+import SignInModal from "@/components/auth/SignInModal";
 import {
   createDraftId,
   createInitialSequences,
@@ -53,23 +54,26 @@ export default function WorkshopPage() {
 
   useEffect(() => {
     if (icon || restoreAttempted) return;
-    if (!localDraftId) {
+    const timeout = window.setTimeout(() => {
+      if (!localDraftId) {
+        setRestoreAttempted(true);
+        return;
+      }
+      const draft = readLocalDraft(localDraftId);
+      if (draft) {
+        loadWorkshopDraft({
+          projectId: draft.projectId,
+          localDraftId: draft.id,
+          name: draft.name,
+          icon: draft.icon,
+          color: draft.color,
+          sequences: draft.sequences,
+          activeSequenceId: draft.activeSequenceId,
+        });
+      }
       setRestoreAttempted(true);
-      return;
-    }
-    const draft = readLocalDraft(localDraftId);
-    if (draft) {
-      loadWorkshopDraft({
-        projectId: draft.projectId,
-        localDraftId: draft.id,
-        name: draft.name,
-        icon: draft.icon,
-        color: draft.color,
-        sequences: draft.sequences,
-        activeSequenceId: draft.activeSequenceId,
-      });
-    }
-    setRestoreAttempted(true);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [icon, loadWorkshopDraft, localDraftId, restoreAttempted]);
 
   if (!icon && !restoreAttempted) {
@@ -163,6 +167,7 @@ function WorkshopEditor({
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(pendingDraft?.projectId ?? null);
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showSignInModal, setShowSignInModal] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState<ProfileModalTab>("cloud");
   const [localDraftId] = useState(() => pendingDraft?.localDraftId ?? createDraftId());
   const [profileName, setProfileName] = useState("");
@@ -180,6 +185,7 @@ function WorkshopEditor({
   useEffect(() => {
     projectNameRef.current = projectName;
   }, [projectName]);
+  const justSignedInRef = useRef(false);
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const loadWorkshopDraft = useProjectStore((state) => state.loadWorkshopDraft);
 
@@ -233,14 +239,24 @@ function WorkshopEditor({
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const error = params.get("authError");
-    if (!error) return;
-    setAuthMessage(error);
-    setProfileModalTab("cloud");
-    setShowProfileModal(true);
+    const signedIn = params.get("signedIn");
+    if (!error && !signedIn) return;
+
+    if (signedIn) justSignedInRef.current = true;
+
     params.delete("authError");
+    params.delete("signedIn");
     const nextSearch = params.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    if (error) {
+      const timeout = window.setTimeout(() => {
+        setAuthMessage(error);
+        setProfileModalTab("cloud");
+        setShowProfileModal(true);
+      }, 0);
+      return () => window.clearTimeout(timeout);
+    }
   }, []);
 
   const refreshProjects = useCallback(async (currentUser: User | null, options?: { silent?: boolean }) => {
@@ -262,12 +278,31 @@ function WorkshopEditor({
   useEffect(() => {
     if (!supabase) return;
 
+    const applySignInNudge = (nextUser: User | null, nextDisplayName: string, nextAvatarUrl: string) => {
+      if (!justSignedInRef.current || !nextUser) return;
+      justSignedInRef.current = false;
+      const complete =
+        projectNameRef.current.trim().length > 0 &&
+        nextDisplayName.trim().length > 0 &&
+        nextAvatarUrl.trim().length > 0;
+      if (complete) {
+        setProfileModalTab("cloud");
+      } else {
+        setProfileModalTab("profile");
+        setShowProfileModal(true);
+        setProfileMessage("Add a display name, avatar, and project name to start autosaving to your account.");
+      }
+    };
+
     supabase.auth.getUser().then(({ data }) => {
       const nextUser = data.user ?? null;
       setUser(nextUser);
-      setProfileName((nextUser?.user_metadata?.display_name as string | undefined) ?? "");
-      setProfileAvatarUrl((nextUser?.user_metadata?.avatar_url as string | undefined) ?? "");
+      const nextDisplayName = (nextUser?.user_metadata?.display_name as string | undefined) ?? "";
+      const nextAvatarUrl = (nextUser?.user_metadata?.avatar_url as string | undefined) ?? "";
+      setProfileName(nextDisplayName);
+      setProfileAvatarUrl(nextAvatarUrl);
       void refreshProjects(nextUser, { silent: true });
+      applySignInNudge(nextUser, nextDisplayName, nextAvatarUrl);
     });
     const {
       data: { subscription },
@@ -279,20 +314,9 @@ function WorkshopEditor({
       setProfileName(nextDisplayName);
       setProfileAvatarUrl(nextAvatarUrl);
       void refreshProjects(nextUser, { silent: true });
+      applySignInNudge(nextUser, nextDisplayName, nextAvatarUrl);
 
-      if (event === "SIGNED_IN" && nextUser) {
-        const complete =
-          projectNameRef.current.trim().length > 0 &&
-          nextDisplayName.trim().length > 0 &&
-          nextAvatarUrl.trim().length > 0;
-        if (complete) {
-          setProfileModalTab("cloud");
-        } else {
-          setProfileModalTab("profile");
-          setShowProfileModal(true);
-          setProfileMessage("Add a display name, avatar, and project name to start autosaving to your account.");
-        }
-      } else if (event === "SIGNED_OUT") {
+      if (event === "SIGNED_OUT") {
         setNotice("Signed out — this workshop now saves locally only.");
       }
     });
@@ -452,8 +476,11 @@ function WorkshopEditor({
   };
 
   const openProfileModal = () => {
+    if (!user) {
+      setShowSignInModal(true);
+      return;
+    }
     setShowProfileModal(true);
-    if (!user) setProfileModalTab("cloud");
   };
 
   const loadSavedProject = (project: SavedProject) => {
@@ -646,6 +673,8 @@ function WorkshopEditor({
     setDeletedSequence(null);
   };
 
+  const [mobilePane, setMobilePane] = useState<"sequences" | "preview" | "details">("preview");
+
   const togglePath = (pathIndex: number) => {
     if (!activeSequence) return;
     const exists = activeSequence.pathIndexes.includes(pathIndex);
@@ -667,52 +696,83 @@ function WorkshopEditor({
         onOpenProfile={openProfileModal}
       />
 
+      <div className="flex border-b border-[var(--line)] md:hidden">
+        {(
+          [
+            ["sequences", "Sequences"],
+            ["preview", "Preview"],
+            ["details", "Details"],
+          ] as const
+        ).map(([pane, label]) => (
+          <button
+            key={pane}
+            type="button"
+            onClick={() => setMobilePane(pane)}
+            className={`min-h-sp-10 flex-1 text-label-xs font-semibold ${
+              mobilePane === pane
+                ? "bg-[var(--active)] text-[var(--active-ink)]"
+                : "bg-[var(--control)] text-[var(--muted)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid min-h-0 flex-1 md:grid-cols-[280px_minmax(0,1fr)_390px]">
-        <SequenceRailPanel
-          totalMs={totalMs}
-          sequences={sequences}
-          onReorder={setSequences}
-          offsets={offsets}
-          activeSequenceId={activeSequence?.id ?? null}
-          onAddSequence={addSequence}
-          onApplyPreset={applyPreset}
-          onSelectSequence={setActiveSequenceId}
-          onDuplicateSequence={duplicateSequence}
-          onDeleteSequence={removeSequence}
-          exportPayload={exportPayload}
-        />
+        <div className={`min-h-0 ${mobilePane === "sequences" ? "block" : "hidden"} md:block`}>
+          <SequenceRailPanel
+            totalMs={totalMs}
+            sequences={sequences}
+            onReorder={setSequences}
+            offsets={offsets}
+            activeSequenceId={activeSequence?.id ?? null}
+            onAddSequence={addSequence}
+            onApplyPreset={applyPreset}
+            onSelectSequence={setActiveSequenceId}
+            onDuplicateSequence={duplicateSequence}
+            onDeleteSequence={removeSequence}
+            exportPayload={exportPayload}
+          />
+        </div>
 
-        <PreviewPane
-          icon={icon}
-          color={color}
-          sequences={sequences}
-          activeSequenceId={activeSequence?.id ?? null}
-          hoveredPathIndex={hoveredPathIndex}
-          playheadMs={playheadMs}
-          isPlaying={isPlaying}
-          playbackMode={playbackMode}
-          totalMs={totalMs}
-          canUndo={sequenceHistory.past.length > 0}
-          canRedo={sequenceHistory.future.length > 0}
-          onPathToggle={togglePath}
-          onPathHover={setHoveredPathIndex}
-          onPlayheadChange={setPlayheadMs}
-          onTogglePlaying={() => setIsPlaying((current) => !current)}
-          onReset={() => {
-            setIsPlaying(false);
-            setPlayheadMs(0);
-          }}
-          onUndo={undoSequenceEdit}
-          onRedo={redoSequenceEdit}
-          onPlaybackModeChange={setPlaybackMode}
-          onScrub={(timeMs) => {
-            setIsPlaying(false);
-            setPlayheadMs(timeMs);
-          }}
-          onSelectSequence={setActiveSequenceId}
-        />
+        <div className={`min-h-0 ${mobilePane === "preview" ? "block" : "hidden"} md:block`}>
+          <PreviewPane
+            icon={icon}
+            color={color}
+            sequences={sequences}
+            activeSequenceId={activeSequence?.id ?? null}
+            hoveredPathIndex={hoveredPathIndex}
+            playheadMs={playheadMs}
+            isPlaying={isPlaying}
+            playbackMode={playbackMode}
+            totalMs={totalMs}
+            canUndo={sequenceHistory.past.length > 0}
+            canRedo={sequenceHistory.future.length > 0}
+            onPathToggle={togglePath}
+            onPathHover={setHoveredPathIndex}
+            onPlayheadChange={setPlayheadMs}
+            onTogglePlaying={() => setIsPlaying((current) => !current)}
+            onReset={() => {
+              setIsPlaying(false);
+              setPlayheadMs(0);
+            }}
+            onUndo={undoSequenceEdit}
+            onRedo={redoSequenceEdit}
+            onPlaybackModeChange={setPlaybackMode}
+            onScrub={(timeMs) => {
+              setIsPlaying(false);
+              setPlayheadMs(timeMs);
+            }}
+            onSelectSequence={setActiveSequenceId}
+          />
+        </div>
 
-        <aside className="min-h-0 overflow-y-auto bg-[var(--surface)]">
+        <aside
+          className={`min-h-0 overflow-y-auto bg-[var(--surface)] ${
+            mobilePane === "details" ? "block" : "hidden"
+          } md:block`}
+        >
           {activeSequence && activeDefinition ? (
             <SequenceDetailsPanel
               icon={icon}
@@ -770,6 +830,7 @@ function WorkshopEditor({
             isDeletingAccount={isDeletingAccount}
           />
         )}
+        {showSignInModal && <SignInModal onClose={() => setShowSignInModal(false)} />}
       </AnimatePresence>
 
       {notice && (

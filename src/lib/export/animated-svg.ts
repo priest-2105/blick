@@ -378,40 +378,43 @@ export async function exportRasterAnimation(
   const totalFrames = Math.max(2, Math.ceil((durationMs / 1000) * options.fps));
   const ffmpeg = await loadFfmpeg();
 
-  for (let frame = 0; frame < totalFrames; frame += 1) {
-    const timeMs = Math.min(durationMs, (frame / (totalFrames - 1)) * durationMs);
-    const svg = buildSvgShell(payload, false, timeMs);
-    const png = await svgToPngFrame(svg, {
-      ...options,
-      transparent: format === "mp4" ? false : options.transparent,
-    });
-    await ffmpeg.writeFile(`frame-${String(frame).padStart(4, "0")}.png`, png);
-    onProgress?.(`Rendered ${frame + 1}/${totalFrames} frames`);
+  try {
+    for (let frame = 0; frame < totalFrames; frame += 1) {
+      const timeMs = Math.min(durationMs, (frame / (totalFrames - 1)) * durationMs);
+      const svg = buildSvgShell(payload, false, timeMs);
+      const png = await svgToPngFrame(svg, {
+        ...options,
+        transparent: format === "mp4" ? false : options.transparent,
+      });
+      await ffmpeg.writeFile(`frame-${String(frame).padStart(4, "0")}.png`, png);
+      onProgress?.(`Rendered ${frame + 1}/${totalFrames} frames`);
+    }
+
+    const output = `blick-output.${format}`;
+    const common = ["-framerate", `${options.fps}`, "-i", "frame-%04d.png"];
+    const args =
+      format === "gif"
+        ? [
+            ...common,
+            "-lavfi",
+            "split[s0][s1];[s0]palettegen=reserve_transparent=1[p];[s1][p]paletteuse",
+            output,
+          ]
+        : format === "mp4"
+          ? [...common, "-pix_fmt", "yuv420p", "-movflags", "faststart", output]
+          : [...common, "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", output];
+
+    onProgress?.(`Encoding ${format.toUpperCase()}`);
+    await ffmpeg.exec(args);
+    const data = await ffmpeg.readFile(output);
+    const rawBytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+    const bytes = new Uint8Array(rawBytes.byteLength);
+    bytes.set(rawBytes);
+    const mime = format === "gif" ? "image/gif" : format === "mp4" ? "video/mp4" : "video/webm";
+    downloadBlob(new Blob([bytes], { type: mime }), `${fileSafeName(payload.icon.name)}-animated.${format}`);
+  } finally {
+    ffmpeg.terminate();
   }
-
-  const output = `blick-output.${format}`;
-  const common = ["-framerate", `${options.fps}`, "-i", "frame-%04d.png"];
-  const args =
-    format === "gif"
-      ? [
-          ...common,
-          "-lavfi",
-          "split[s0][s1];[s0]palettegen=reserve_transparent=1[p];[s1][p]paletteuse",
-          output,
-        ]
-      : format === "mp4"
-        ? [...common, "-pix_fmt", "yuv420p", "-movflags", "faststart", output]
-        : [...common, "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", output];
-
-  onProgress?.(`Encoding ${format.toUpperCase()}`);
-  await ffmpeg.exec(args);
-  const data = await ffmpeg.readFile(output);
-  const rawBytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
-  const bytes = new Uint8Array(rawBytes.byteLength);
-  bytes.set(rawBytes);
-  const mime = format === "gif" ? "image/gif" : format === "mp4" ? "video/mp4" : "video/webm";
-  downloadBlob(new Blob([bytes], { type: mime }), `${fileSafeName(payload.icon.name)}-animated.${format}`);
-  ffmpeg.terminate();
 }
 
 export function singleSequencePayload({

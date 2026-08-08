@@ -1,12 +1,13 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import type { IconMeta } from "../../../types/icon";
 import type { AnimationDefinition } from "@/lib/animation/types";
 import { getAnimation } from "@/lib/animation/registry";
 import ParamControls from "@/components/detail/ParamControls";
 import RangeSlider from "@/components/ui/RangeSlider";
 import Select from "@/components/ui/Select";
-import type { GlyphName } from "./Glyph";
+import Glyph, { type GlyphName } from "./Glyph";
 import IconButton from "./IconButton";
 import {
   defaultParams,
@@ -44,11 +45,72 @@ export default function SequenceDetailsPanel({
   onDeleteSequence: (id: string) => void;
   onTogglePath: (pathIndex: number) => void;
 }) {
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [draftName, setDraftName] = useState(activeSequence.name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [lastSequenceId, setLastSequenceId] = useState(activeSequence.id);
+
+  if (activeSequence.id !== lastSequenceId) {
+    setLastSequenceId(activeSequence.id);
+    setIsEditingName(false);
+  }
+
+  const startEditingName = () => {
+    setDraftName(activeSequence.name);
+    setIsEditingName(true);
+  };
+
+  useEffect(() => {
+    if (isEditingName) nameInputRef.current?.focus();
+  }, [isEditingName]);
+
+  const commitName = () => {
+    const trimmed = draftName.trim();
+    if (trimmed && trimmed !== activeSequence.name) {
+      onUpdateSequence(activeSequence.id, { name: trimmed });
+    }
+    setIsEditingName(false);
+  };
+
   return (
     <div className="space-y-sp-7 p-sp-7">
       <div className="flex items-start justify-between gap-sp-6">
-        <div>
-          <h2 className="text-label-lg font-semibold">{activeSequence.name}</h2>
+        <div className="min-w-0 flex-1">
+          {isEditingName ? (
+            <input
+              ref={nameInputRef}
+              value={draftName}
+              onChange={(event) => setDraftName(event.target.value)}
+              onBlur={commitName}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  commitName();
+                } else if (event.key === "Escape") {
+                  setIsEditingName(false);
+                }
+              }}
+              className="min-h-sp-9 w-full rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-4 text-label-lg font-semibold text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+            />
+          ) : (
+            <div className="flex items-center gap-sp-3">
+              <h2
+                onDoubleClick={startEditingName}
+                title="Double-click to rename"
+                className="cursor-text truncate text-label-lg font-semibold"
+              >
+                {activeSequence.name}
+              </h2>
+              <button
+                type="button"
+                onClick={startEditingName}
+                aria-label="Rename sequence"
+                className="grid h-sp-7 w-sp-7 shrink-0 place-items-center rounded-sm text-[var(--muted)] hover:text-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              >
+                <Glyph name="edit" className="h-sp-5 w-sp-5" />
+              </button>
+            </div>
+          )}
           <div className="mt-sp-5 grid grid-cols-3 border border-[var(--line)] text-label-xs">
             <div className="border-r border-[var(--line)] p-sp-4">
               <p className="text-[var(--subtle)]">Start</p>
@@ -78,15 +140,6 @@ export default function SequenceDetailsPanel({
           />
         )}
       </div>
-
-      <label className="flex flex-col gap-sp-4 text-label-sm font-medium text-[var(--muted)]">
-        Name
-        <input
-          value={activeSequence.name}
-          onChange={(event) => onUpdateSequence(activeSequence.id, { name: event.target.value })}
-          className="min-h-sp-10 rounded-sm border border-[var(--line-strong)] bg-[var(--control)] px-sp-5 text-label-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-        />
-      </label>
 
       <label className="flex flex-col gap-sp-4 text-label-sm font-medium text-[var(--muted)]">
         Animation

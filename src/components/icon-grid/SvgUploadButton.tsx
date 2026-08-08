@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { IconMeta } from "../../../types/icon";
 import { hasVisibleStroke, normalizeSvg } from "@/lib/icons/normalize-svg";
 import { useProjectStore } from "@/lib/state/project-store";
-import { createDraftId } from "@/lib/workshop/sequences";
+import { createDefaultSequences, createDraftId, writeLocalDraft } from "@/lib/workshop/sequences";
 
 const MAX_FILE_SIZE = 1024 * 1024;
 
@@ -19,6 +19,7 @@ export default function SvgUploadButton() {
   const setIcon = useProjectStore((state) => state.setIcon);
   const setAnimationId = useProjectStore((state) => state.setAnimationId);
   const setDurationMs = useProjectStore((state) => state.setDurationMs);
+  const color = useProjectStore((state) => state.color);
   const [status, setStatus] = useState<string | null>(null);
 
   const handleFile = async (file: File | undefined) => {
@@ -61,7 +62,18 @@ export default function SvgUploadButton() {
       setAnimationId(isStrokeBased ? "draw-on" : "fade-in");
       setDurationMs(isStrokeBased ? 1200 : 700);
       setStatus(null);
-      router.push(`/workshop/${createDraftId()}`);
+      const draftId = createDraftId();
+      writeLocalDraft({
+        id: draftId,
+        projectId: null,
+        name: icon.name,
+        icon,
+        color,
+        sequences: createDefaultSequences(icon),
+        activeSequenceId: null,
+        updatedAt: new Date().toISOString(),
+      });
+      router.push(`/workshop/${draftId}`);
     } catch {
       setStatus("Could not read that SVG.");
     } finally {

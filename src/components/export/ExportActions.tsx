@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import type { ExportPayload } from "@/lib/export/animated-svg";
 import {
   buildCssExport,
@@ -9,7 +10,9 @@ import {
   downloadHtmlExport,
   exportRasterAnimation,
 } from "@/lib/export/animated-svg";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import Select from "@/components/ui/Select";
+import SignInModal from "@/components/auth/SignInModal";
 
 type CodeSnippet = "react" | "css";
 
@@ -23,6 +26,9 @@ export default function ExportActions({
   fullWidth?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [showSignIn, setShowSignIn] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [busyFormat, setBusyFormat] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [size, setSize] = useState(768);
@@ -31,6 +37,23 @@ export default function ExportActions({
   const [transparent, setTransparent] = useState(true);
   const [snippet, setSnippet] = useState<CodeSnippet>("react");
   const disabled = !payload || busyFormat !== null;
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null));
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
+  const handleTriggerClick = () => {
+    if (supabase && !user) {
+      setShowSignIn(true);
+      return;
+    }
+    setOpen(true);
+  };
 
   const snippetCode = useMemo(() => {
     if (!payload) return "";
@@ -78,11 +101,19 @@ export default function ExportActions({
       <button
         type="button"
         disabled={!payload}
-        onClick={() => setOpen(true)}
+        onClick={handleTriggerClick}
         className={triggerClass}
       >
         {label}
       </button>
+
+      {showSignIn && (
+        <SignInModal
+          onClose={() => setShowSignIn(false)}
+          title="Sign in to export"
+          description="Create a free account to export your animation."
+        />
+      )}
 
       {open && (
         <div className="fixed inset-0 z-[60] grid place-items-center bg-black/75 p-sp-6">
